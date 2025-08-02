@@ -6,6 +6,7 @@ import { PrintableChallan } from './challans/PrintableChallan'
 import { generateJPGChallan, downloadJPGChallan } from '../utils/jpgChallanGenerator'
 import { ChallanData } from './challans/types'
 import { useAuth } from '../hooks/useAuth'
+import { PartnerSelector } from './PartnerSelector'
 
 type Client = Database['public']['Tables']['clients']['Row']
 
@@ -27,6 +28,7 @@ export function ReturnPage() {
   const [returnChallanNumber, setReturnChallanNumber] = useState('')
   const [suggestedChallanNumber, setSuggestedChallanNumber] = useState('')
   const [returnDate, setReturnDate] = useState(new Date().toISOString().split('T')[0])
+  const [selectedPartnerId, setSelectedPartnerId] = useState('MAIN')
   const [quantities, setQuantities] = useState<Record<string, number>>({})
   const [overallNote, setOverallNote] = useState('')
   const [loading, setLoading] = useState(false)
@@ -145,7 +147,8 @@ export function ReturnPage() {
         .insert([{
           return_challan_number: returnChallanNumber,
           client_id: selectedClient.id,
-          return_date: returnDate
+          return_date: returnDate,
+          partner_id: selectedPartnerId
         }])
         .select()
         .single()
@@ -156,7 +159,8 @@ export function ReturnPage() {
       if (returnEntries.length > 0) {
         const lineItems = returnEntries.map(entry => ({
           return_id: returnRecord.id,
-          ...entry
+          ...entry,
+          partner_id: selectedPartnerId
         }))
 
         const { error: lineItemsError } = await supabase
@@ -206,6 +210,7 @@ export function ReturnPage() {
       setQuantities({})
       setOverallNote('')
       setReturnChallanNumber('')
+      setSelectedPartnerId('MAIN')
       setSelectedClient(null)
       setChallanData(null)
       
@@ -282,6 +287,14 @@ export function ReturnPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Partner Selection */}
+            <PartnerSelector
+              selectedPartnerId={selectedPartnerId}
+              onPartnerSelect={setSelectedPartnerId}
+              showStockInfo={true}
+              plateSize={Object.keys(quantities).find(size => quantities[size] > 0)}
+            />
+
             {/* Return Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 rounded-lg p-4">
               <div>

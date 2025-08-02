@@ -164,7 +164,8 @@ export function ChallanManagementPage() {
           .from('challans')
           .select(`
             *,
-            challan_items(*)
+            challan_items(*),
+            partner:partners(name)
           `)
           .eq('id', challan.id)
           .single();
@@ -190,7 +191,8 @@ export function ChallanManagementPage() {
           .from('returns')
           .select(`
             *,
-            return_line_items(*)
+            return_line_items(*),
+            partner:partners(name)
           `)
           .eq('id', challan.id)
           .single();

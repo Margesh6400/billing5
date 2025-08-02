@@ -27,6 +27,7 @@ export function Layout() {
     { name: 'Return', path: '/return', icon: RotateCcw },
     { name: 'Ledger', path: '/ledger', icon: BookOpen },
     { name: 'Stock', path: '/stock', icon: Package },
+    { name: 'Partner Stock', path: '/partner-stock', icon: Users },
     { name: 'Challan Management', path: '/challans', icon: Receipt },
     { name: 'Bill Management', path: '/bills', icon: DollarSign }
   ]
@@ -35,7 +36,7 @@ export function Layout() {
   const navigation = user?.isAdmin 
     ? allNavigation 
     : allNavigation.filter(item => 
-        ['/', '/ledger', '/challans', '/stock'].includes(item.path)
+        ['/', '/ledger', '/challans', '/stock', '/partner-stock'].includes(item.path)
       )
 
   const handleSignOut = async () => {

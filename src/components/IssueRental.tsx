@@ -7,6 +7,7 @@ import { PrintableChallan } from './challans/PrintableChallan'
 import { generateJPGChallan, downloadJPGChallan } from '../utils/jpgChallanGenerator'
 import { ChallanData } from './challans/types'
 import { useAuth } from '../hooks/useAuth'
+import { PartnerSelector } from './PartnerSelector'
 
 type Client = Database['public']['Tables']['clients']['Row']
 type Stock = Database['public']['Tables']['stock']['Row']
@@ -28,6 +29,7 @@ export function IssueRental() {
   const [challanNumber, setChallanNumber] = useState('')
   const [suggestedChallanNumber, setSuggestedChallanNumber] = useState('')
   const [challanDate, setChallanDate] = useState(new Date().toISOString().split('T')[0])
+  const [selectedPartnerId, setSelectedPartnerId] = useState('MAIN')
   const [quantities, setQuantities] = useState<Record<string, number>>({})
   const [plateNotes, setPlateNotes] = useState<Record<string, string>>({}) // ADD THIS MISSING STATE
   const [overallNote, setOverallNote] = useState('')
@@ -180,7 +182,8 @@ export function IssueRental() {
         .insert([{
           challan_number: challanNumber,
           client_id: selectedClient!.id,
-          challan_date: challanDate
+          challan_date: challanDate,
+          partner_id: selectedPartnerId
         }])
         .select()
         .single()
@@ -191,7 +194,8 @@ export function IssueRental() {
         challan_id: challan.id,
         plate_size: size,
         borrowed_quantity: quantities[size],
-        partner_stock_notes: plateNotes[size]?.trim() || null // FIX: Use plateNotes instead of overallNote
+        partner_stock_notes: plateNotes[size]?.trim() || null, // FIX: Use plateNotes instead of overallNote
+        partner_id: selectedPartnerId
       }))
 
       const { error: lineItemsError } = await supabase
@@ -232,6 +236,7 @@ export function IssueRental() {
         setPlateNotes({}) // FIX: Reset plateNotes too
         setOverallNote('')
         setChallanNumber('')
+        setSelectedPartnerId('MAIN')
         setSelectedClient(null)
         setStockValidation([])
         setChallanData(null)
@@ -323,6 +328,14 @@ export function IssueRental() {
               Issue Plates
             </h2>
           </div>
+
+          {/* Partner Selection */}
+          <PartnerSelector
+            selectedPartnerId={selectedPartnerId}
+            onPartnerSelect={setSelectedPartnerId}
+            showStockInfo={true}
+            plateSize={Object.keys(quantities).find(size => quantities[size] > 0)}
+          />
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 rounded-lg p-4">

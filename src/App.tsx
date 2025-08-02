@@ -10,6 +10,10 @@ import { MobileClientsPage } from './components/MobileClientsPage'
 import { MobileStockPage } from './components/MobileStockPage'
 import { MobileLedgerPage } from './components/mobile/MobileLedgerPage'
 import { BillingPage } from './components/BillingPage'
+import { PartnerStockPage } from './components/PartnerStockPage'
+import { EnhancedStockPage } from './components/EnhancedStockPage'
+import { EnhancedIssueRental } from './components/EnhancedIssueRental'
+import { EnhancedReturnPage } from './components/EnhancedReturnPage'
 import { ChallanManagementPage } from './components/ChallanManagementPage'
 import { BillManagementPage } from './components/BillManagementPage'
 import { LanguageProvider } from './contexts/LanguageContext'
@@ -40,9 +44,13 @@ function App() {
         <Routes>
           <Route path="/" element={<MobileDashboard />} />
           <Route path="/issue" element={<MobileIssueRental />} />
+          <Route path="/enhanced-issue" element={<EnhancedIssueRental />} />
           <Route path="/return" element={<MobileReturnPage />} />
+          <Route path="/enhanced-return" element={<EnhancedReturnPage />} />
           <Route path="/clients" element={<MobileClientsPage />} />
           <Route path="/stock" element={<MobileStockPage />} />
+          <Route path="/enhanced-stock" element={<EnhancedStockPage />} />
+          <Route path="/partner-stock" element={<PartnerStockPage />} />
           <Route path="/ledger" element={<MobileLedgerPage />} />
           <Route path="/challans" element={<ChallanManagementPage />} />
           <Route path="/bills" element={<BillManagementPage />} />

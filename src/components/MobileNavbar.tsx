@@ -9,9 +9,13 @@ import { useAuth, UserWithRole } from '../hooks/useAuth'
 const NAVIGATION_ITEMS = [
   { key: 'dashboard', label: 'ડેશબોર્ડ', icon: Home, path: '/' },
   { key: 'issue', label: 'ઉધાર', icon: FileText, path: '/issue' },
+  { key: 'enhanced-issue', label: 'ઉધાર (Enhanced)', icon: FileText, path: '/enhanced-issue' },
   { key: 'return', label: 'જમા', icon: RotateCcw, path: '/return' },
+  { key: 'enhanced-return', label: 'જમા (Enhanced)', icon: RotateCcw, path: '/enhanced-return' },
   { key: 'clients', label: 'ગ્રાહકો', icon: Users, path: '/clients' },
   { key: 'stock', label: 'સ્ટોક', icon: Package, path: '/stock' },
+  { key: 'enhanced-stock', label: 'સ્ટોક (Enhanced)', icon: Package, path: '/enhanced-stock' },
+  { key: 'partner-stock', label: 'પાર્ટનર સ્ટોક', icon: Users, path: '/partner-stock' },
   { key: 'challans', label: 'ચલણ બૂક', icon: Receipt, path: '/challans' },
   { key: 'bills', label: 'બિલ', icon: DollarSign, path: '/bills' },
   { key: 'ledger', label: 'ખાતાવહી', icon: BarChart3, path: '/ledger' }
@@ -20,8 +24,8 @@ const NAVIGATION_ITEMS = [
 // Bottom navigation items - only 4 items as requested
 const BOTTOM_NAV_ITEMS = [
   { key: 'dashboard', label: 'હોમ', icon: Home, path: '/' },
-  { key: 'issue', label: 'ઉધાર', icon: FileText, path: '/issue' },
-  { key: 'return', label: 'જમા', icon: RotateCcw, path: '/return' },
+  { key: 'enhanced-issue', label: 'ઉધાર', icon: FileText, path: '/enhanced-issue' },
+  { key: 'enhanced-return', label: 'જમા', icon: RotateCcw, path: '/enhanced-return' },
   { key: 'ledger', label: 'ખાતાવહી', icon: BarChart3, path: '/ledger' }
 ]
 
@@ -37,7 +41,7 @@ export function MobileNavbar() {
     if (user?.isAdmin) return items
     // Non-admin users can only access dashboard, ledger, and view-only pages
     return items.filter(item => 
-      ['dashboard', 'ledger', 'challans', 'clients', 'stock'].includes(item.key)
+      ['dashboard', 'ledger', 'challans', 'clients', 'stock', 'partner-stock'].includes(item.key)
     )
   }
 

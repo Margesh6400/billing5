@@ -36,6 +36,9 @@ export function PrintableChallan({ data, containerRef }: PrintableChallanProps) 
       <div className="flex justify-between mb-6 border p-3 bg-gray-50 rounded">
         <div><strong>Challan No:</strong> {data.challan_number}</div>
         <div><strong>Date:</strong> {format(new Date(data.date), 'dd/MM/yyyy')}</div>
+        {data.partner_name && (
+          <div><strong>Partner:</strong> {data.partner_name}</div>
+        )}
       </div>
 
       {/* Client Details */}
@@ -45,6 +48,9 @@ export function PrintableChallan({ data, containerRef }: PrintableChallanProps) 
           <div>
             <div><strong>Client ID:</strong> {data.client.id}</div>
             <div><strong>Name:</strong> {data.client.name}</div>
+            {data.driver_name && (
+              <div><strong>Driver:</strong> {data.driver_name}</div>
+            )}
           </div>
           <div>
             <div><strong>Site:</strong> {data.client.site}</div>

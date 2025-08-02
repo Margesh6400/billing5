@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { generateJPGChallan, downloadJPGChallan } from "../utils/jpgChallanGenerator";
 import { ChallanData } from "./challans/types";
+import { PartnerSelector } from "./PartnerSelector";
 
 type Client = Database["public"]["Tables"]["clients"]["Row"];
 type Stock = Database["public"]["Tables"]["stock"]["Row"];
@@ -41,6 +42,7 @@ export function MobileIssueRental() {
   const [challanNumber, setChallanNumber] = useState("");
   const [suggestedChallanNumber, setSuggestedChallanNumber] = useState("");
   const [challanDate, setChallanDate] = useState(new Date().toISOString().split("T")[0]);
+  const [selectedPartnerId, setSelectedPartnerId] = useState("MAIN");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [driverName, setDriverName] = useState("");
@@ -208,7 +210,8 @@ export function MobileIssueRental() {
           challan_number: challanNumber,
           client_id: selectedClient!.id,
           challan_date: challanDate,
-          driver_name: driverName || null
+          driver_name: driverName || null,
+          partner_id: selectedPartnerId
         }])
         .select()
         .single();
@@ -219,7 +222,8 @@ export function MobileIssueRental() {
         challan_id: challan.id,
         plate_size: size,
         borrowed_quantity: quantities[size],
-        partner_stock_notes: notes[size]?.trim() || null
+        partner_stock_notes: notes[size]?.trim() || null,
+        partner_id: selectedPartnerId
       }));
 
       const { error: lineItemsError } = await supabase
@@ -257,6 +261,7 @@ export function MobileIssueRental() {
       setNotes({});
       setChallanNumber("");
       setDriverName("");
+      setSelectedPartnerId("MAIN");
       setSelectedClient(null);
       setStockValidation([]);
       setChallanData(null);
@@ -596,6 +601,18 @@ export function MobileIssueRental() {
             </div>
 
             <div className="p-2 space-y-2">
+              {/* Partner Selection */}
+              <div>
+                <label className="block mb-1 text-xs font-medium text-gray-700">
+                  પાર્ટનર પસંદ કરો *
+                </label>
+                <PartnerSelector
+                  selectedPartnerId={selectedPartnerId}
+                  onPartnerSelect={setSelectedPartnerId}
+                  showStockInfo={false}
+                />
+              </div>
+
               {/* Compact Form Header */}
             <div className="grid grid-cols-2 gap-2">
               <div>

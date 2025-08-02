@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/supabase';
-import { Package, Plus, Edit3, Save, X, AlertTriangle, CheckCircle, Search, BarChart3, Lock } from 'lucide-react';
+import { Package, Plus, Edit3, Save, X, AlertTriangle, CheckCircle, Search, BarChart3, Lock, Users } from 'lucide-react';
 import { T } from '../contexts/LanguageContext';
 import { useAuth } from '../hooks/useAuth';
+import { Link } from 'react-router-dom';
 
 type Stock = Database['public']['Tables']['stock']['Row'];
 
@@ -263,6 +264,17 @@ export function MobileStockPage() {
           </div>
           <h1 className="mb-1 text-base font-bold text-gray-900">સ્ટોક</h1>
           <p className="text-xs text-blue-600">ઇન્વેન્ટરી મેનેજમેન્ટ</p>
+          
+          {/* Partner Stock Link */}
+          <div className="mt-2">
+            <Link
+              to="/partner-stock"
+              className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-600 bg-blue-100 rounded-full hover:bg-blue-200 transition-colors"
+            >
+              <Users className="w-3 h-3" />
+              પાર્ટનર સ્ટોક જુઓ
+            </Link>
+          </div>
         </div>
 
         {/* Blue Themed Stock Table */}

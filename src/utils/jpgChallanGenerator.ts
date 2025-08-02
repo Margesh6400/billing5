@@ -12,6 +12,8 @@ export interface ChallanData {
     mobile: string;
   };
   driver_name?: string;
+  partner_id?: string;
+  partner_name?: string;
   plates: Array<{
     size: string;
     quantity: number;

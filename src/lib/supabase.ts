@@ -70,6 +70,58 @@ export type Database = {
           updated_at?: string
         }
       }
+      partners: {
+        Row: {
+          id: string
+          name: string
+          description: string
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id: string
+          name: string
+          description?: string
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string
+          is_active?: boolean
+          created_at?: string
+        }
+      }
+      partner_stock: {
+        Row: {
+          id: number
+          partner_id: string
+          plate_size: string
+          total_quantity: number
+          available_quantity: number
+          on_rent_quantity: number
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          partner_id: string
+          plate_size: string
+          total_quantity?: number
+          available_quantity?: number
+          on_rent_quantity?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          partner_id?: string
+          plate_size?: string
+          total_quantity?: number
+          available_quantity?: number
+          on_rent_quantity?: number
+          updated_at?: string
+        }
+      }
       challans: {
         Row: {
           id: number
@@ -79,6 +131,7 @@ export type Database = {
           status: string
           created_at: string
           driver_name: string | null
+          partner_id: string
         }
         Insert: {
           id?: number
@@ -88,6 +141,7 @@ export type Database = {
           status?: string
           created_at?: string
           driver_name?: string | null
+          partner_id?: string
         }
         Update: {
           id?: number
@@ -97,6 +151,7 @@ export type Database = {
           status?: string
           created_at?: string
           driver_name?: string | null
+          partner_id?: string
         }
       }
       challan_items: {
@@ -109,6 +164,7 @@ export type Database = {
           partner_stock_notes: string | null
           status: string
           created_at: string
+          partner_id: string
         }
         Insert: {
           id?: number
@@ -119,6 +175,7 @@ export type Database = {
           partner_stock_notes?: string | null
           status?: string
           created_at?: string
+          partner_id?: string
         }
         Update: {
           id?: number
@@ -129,6 +186,7 @@ export type Database = {
           partner_stock_notes?: string | null
           status?: string
           created_at?: string
+          partner_id?: string
         }
       }
       returns: {
@@ -138,6 +196,8 @@ export type Database = {
           client_id: string
           return_date: string
           created_at: string
+          driver_name: string | null
+          partner_id: string
         }
         Insert: {
           id?: number
@@ -145,6 +205,8 @@ export type Database = {
           client_id: string
           return_date: string
           created_at?: string
+          driver_name?: string | null
+          partner_id?: string
         }
         Update: {
           id?: number
@@ -152,6 +214,8 @@ export type Database = {
           client_id?: string
           return_date?: string
           created_at?: string
+          driver_name?: string | null
+          partner_id?: string
         }
       }
       return_line_items: {
@@ -163,6 +227,7 @@ export type Database = {
           damage_notes: string | null
           partner_stock_notes: string | null
           created_at: string
+          partner_id: string
         }
         Insert: {
           id?: number
@@ -172,6 +237,7 @@ export type Database = {
           damage_notes?: string | null
           partner_stock_notes?: string | null
           created_at?: string
+          partner_id?: string
         }
         Update: {
           id?: number
@@ -181,6 +247,7 @@ export type Database = {
           damage_notes?: string | null
           partner_stock_notes?: string | null
           created_at?: string
+          partner_id?: string
         }
       }
       bills: {

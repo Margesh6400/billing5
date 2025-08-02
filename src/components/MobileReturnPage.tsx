@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { generateJPGChallan, downloadJPGChallan } from "../utils/jpgChallanGenerator";
 import { ChallanData } from "./challans/types";
+import { PartnerSelector } from "./PartnerSelector";
 
 type Client = Database["public"]["Tables"]["clients"]["Row"];
 
@@ -39,6 +40,7 @@ export function MobileReturnPage() {
   const [suggestedChallanNumber, setSuggestedChallanNumber] = useState("");
   const [returnDate, setReturnDate] = useState(new Date().toISOString().split("T")[0]);
   const [driverName, setDriverName] = useState("");
+  const [selectedPartnerId, setSelectedPartnerId] = useState("MAIN");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -224,7 +226,8 @@ export function MobileReturnPage() {
           return_challan_number: returnChallanNumber,
           client_id: selectedClient!.id,
           return_date: returnDate,
-          driver_name: driverName || null
+          driver_name: driverName || null,
+          partner_id: selectedPartnerId
         }])
         .select()
         .single();
@@ -273,6 +276,7 @@ export function MobileReturnPage() {
       setNotes({});
       setReturnChallanNumber("");
       setSelectedClient(null);
+      setSelectedPartnerId("MAIN");
       setChallanData(null);
       setShowClientSelector(false);
       setOutstandingPlates({});
@@ -557,6 +561,18 @@ export function MobileReturnPage() {
             </div>
 
             <div className="p-2 space-y-2">
+              {/* Partner Selection */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  પાર્ટનર પસંદ કરો *
+                </label>
+                <PartnerSelector
+                  selectedPartnerId={selectedPartnerId}
+                  onPartnerSelect={setSelectedPartnerId}
+                  showStockInfo={false}
+                />
+              </div>
+
               {/* Compact Form Header */}
               <div className="grid grid-cols-2 gap-2">
                 <div>

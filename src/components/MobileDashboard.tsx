@@ -264,7 +264,7 @@ export function MobileDashboard() {
             {user?.isAdmin ? (
               <>
                 <QuickAccessCard
-                  to="/issue"
+                  to="/enhanced-issue"
                   title="ઉધાર ચલણ"
                   subtitle="નવું ઉધાર બનાવો"
                   icon={FileText}
@@ -272,7 +272,7 @@ export function MobileDashboard() {
                   count={stats.activeUdharChallans}
                 />
                 <QuickAccessCard
-                  to="/return"
+                  to="/enhanced-return"
                   title="જમા ચલણ"
                   subtitle="પ્લેટ્સ પરત કરો"
                   icon={RotateCcw}
@@ -307,7 +307,7 @@ export function MobileDashboard() {
               count={stats.activeUdharChallans}
               />
             <QuickAccessCard
-              to="/stock"
+              to="/enhanced-stock"
               title="સ્ટોક"
               subtitle="ઇન્વેન્ટરી જુઓ"
               icon={Package}
@@ -411,7 +411,7 @@ export function MobileDashboard() {
         {user?.isAdmin && (
           <div className="fixed z-40 bottom-20 right-4 md:hidden">
             <Link
-              to="/issue"
+              to="/enhanced-issue"
               className="flex items-center justify-center p-4 text-white transition-all duration-200 border-2 border-blue-300 rounded-full shadow-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-110"
             >
               <Plus className="w-6 h-6" />

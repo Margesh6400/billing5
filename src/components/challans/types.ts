@@ -19,6 +19,8 @@ export interface ChallanData {
   date: string;
   client: Client;
   driver_name?: string;
+  partner_id?: string;
+  partner_name?: string;
   plates: PlateEntry[];
   total_quantity: number;
 }

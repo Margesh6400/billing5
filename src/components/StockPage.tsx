@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { Database } from '../lib/supabase'
-import { Package, Plus, Edit3, Save, X, AlertTriangle, CheckCircle, Lock } from 'lucide-react'
+import { Package, Plus, Edit3, Save, X, AlertTriangle, CheckCircle, Lock, Users } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+import { Link } from 'react-router-dom'
 
 type Stock = Database['public']['Tables']['stock']['Row']
 
@@ -136,6 +137,17 @@ export function StockPage() {
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Stock Management</h1>
         <p className="text-gray-600">Manage your plate inventory levels</p>
+        
+        {/* Partner Stock Link */}
+        <div className="mt-4">
+          <Link
+            to="/partner-stock"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-100 rounded-lg hover:bg-blue-200 transition-colors"
+          >
+            <Users className="w-4 h-4" />
+            View Partner Stock Management
+          </Link>
+        </div>
       </div>
 
       {/* Add New Plate Size */}

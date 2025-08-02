@@ -52,6 +52,7 @@ export function MobileIssueRental() {
   const [challanData, setChallanData] = useState<ChallanData | null>(null);
   const [showClientSelector, setShowClientSelector] = useState(false);
   const [previousDrivers, setPreviousDrivers] = useState<string[]>([]);
+  const [allowZeroStock, setAllowZeroStock] = useState(false);
 
   useEffect(() => { 
     fetchStockData(); 
@@ -62,6 +63,26 @@ export function MobileIssueRental() {
   useEffect(() => { 
     if (Object.keys(quantities).length > 0) validateStockAvailability(); 
   }, [quantities, stockData]);
+
+  // Remove stock validation that blocks challan creation
+  const validateStockAvailability = () => {
+    // Allow creation even with insufficient stock
+    // Just show warnings but don't block
+    const warnings: StockValidation[] = [];
+    Object.entries(quantities).forEach(([size, quantity]) => {
+      if (quantity > 0) {
+        const stock = stockData.find(s => s.plate_size === size);
+        if (stock && quantity > stock.available_quantity) {
+          warnings.push({
+            size,
+            requested: quantity,
+            available: stock.available_quantity
+          });
+        }
+      }
+    });
+    setStockValidation(warnings);
+  };
 
   async function fetchPreviousDriverNames() {
     try {
@@ -203,7 +224,14 @@ export function MobileIssueRental() {
         alert("ઓછામાં ઓછી એક પ્લેટની માત્રા દાખલ કરો.");
         return;
       }
-
+      
+      // Remove stock validation blocking - allow creation with warnings
+      if (stockValidation.length > 0 && !allowZeroStock) {
+        const confirmMessage = `સ્ટોક ચેતવણી: ${stockValidation.map(v => `${v.size}(${v.requested}>${v.available})`).join(', ')}\n\nશું તમે આગળ વધવા માંગો છો?`;
+        if (!confirm(confirmMessage)) {
+          return;
+        }
+      }
       const { data: challan, error: challanError } = await supabase
         .from("challans")
         .insert([{
@@ -666,9 +694,24 @@ export function MobileIssueRental() {
 
               {/* Stock Warning */}
               {stockValidation.length > 0 && (
-                <div className="flex items-center gap-1 p-1 border rounded text-amber-700 bg-amber-50 border-amber-200">
+                <div className="flex items-center gap-1 p-1 border rounded text-orange-700 bg-orange-50 border-orange-200">
                   <AlertTriangle className="w-3 h-3" />
-                  <span className="text-xs">અપૂરતો સ્ટોક</span>
+                  <span className="text-xs">સ્ટોક ચેતવણી - આગળ વધી શકાય</span>
+                </div>
+              )}
+
+              {/* Allow zero stock checkbox */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="allowZeroStock"
+                  checked={allowZeroStock}
+                  onChange={(e) => setAllowZeroStock(e.target.checked)}
+                  className="w-3 h-3 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                />
+                <label htmlFor="allowZeroStock" className="text-xs text-gray-700">
+                  શૂન્ય સ્ટોક સાથે પણ ચલણ બનાવો
+                </label>
                 </div>
               )}
 
@@ -688,11 +731,11 @@ export function MobileIssueRental() {
                       const stockInfo = getStockInfo(size);
                       const isInsufficient = isStockInsufficient(size);
                       return (
-                        <tr key={size} className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} ${isInsufficient ? 'bg-red-50' : ''}`}>
+                        <tr key={size} className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} ${isInsufficient && !allowZeroStock ? 'bg-orange-50' : ''}`}>
                           <td className="px-1 py-1 font-medium">{size}</td>
                           <td className="px-1 py-1 text-center">
-                            <span className={`inline-flex items-center justify-center w-5 h-5 rounded font-bold ${
-                              isInsufficient ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                            <span className={`inline-flex items-center justify-center w-5 h-5 rounded text-xs font-bold ${
+                              isInsufficient && !allowZeroStock ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'
                             }`}>
                               {stockInfo?.available_quantity || 0}
                             </span>
@@ -704,12 +747,12 @@ export function MobileIssueRental() {
                               value={quantities[size] || ""}
                               onChange={e => handleQuantityChange(size, e.target.value)}
                               className={`w-10 px-0.5 py-0.5 border rounded text-center ${
-                                isInsufficient ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                                isInsufficient && !allowZeroStock ? 'border-orange-300 bg-orange-50' : 'border-gray-300'
                               }`}
                               placeholder="0"
                             />
-                            {isInsufficient && (
-                              <div className="text-xs text-red-600 mt-0.5">
+                            {isInsufficient && !allowZeroStock && (
+                              <div className="text-xs text-orange-600 mt-0.5">
                                 માત્ર {stockValidation.find(item => item.size === size)?.available}
                               </div>
                             )}

@@ -37,7 +37,6 @@ export function IssueRental() {
   const [loading, setLoading] = useState(false)
   const [stockValidation, setStockValidation] = useState<StockValidation[]>([])
   const [challanData, setChallanData] = useState<ChallanData | null>(null)
-  const [allowInsufficientStock, setAllowInsufficientStock] = useState(false)
 
   // ... (keep all existing useEffect and functions the same until handleSubmit)
 
@@ -47,12 +46,10 @@ export function IssueRental() {
   }, [])
 
   useEffect(() => {
-    if (Object.keys(quantities).length > 0 && !allowInsufficientStock) {
+    if (Object.keys(quantities).length > 0) {
       validateStockAvailability()
-    } else if (allowInsufficientStock) {
-      setStockValidation([]) // Clear validation when allowing insufficient stock
     }
-  }, [quantities, stockData, allowInsufficientStock])
+  }, [quantities, stockData])
 
   const fetchStockData = async () => {
     try {
@@ -173,10 +170,9 @@ export function IssueRental() {
         return
       }
 
-      // Show confirmation for stock issues but don't block
-      if (stockValidation.length > 0 && !allowInsufficientStock) {
-        const confirmMessage = `Stock Warning: ${stockValidation.map(v => `${v.size}(${v.requested}>${v.available})`).join(', ')}\n\nDo you want to proceed?`;
-        if (!confirm(confirmMessage)) {
+      if (stockValidation.length > 0) {
+        if (!overallNote.trim()) {
+          alert('Please add a note for items with insufficient stock.')
           return
         }
       }
@@ -373,25 +369,12 @@ export function IssueRental() {
             </div>
 
             {stockValidation.length > 0 && (
-              <div className="flex items-center gap-2 text-orange-600 bg-orange-50 p-3 rounded-lg">
+              <div className="flex items-center gap-2 text-amber-600 bg-amber-50 p-3 rounded-lg">
                 <AlertTriangle className="w-4 h-4" />
-                <span className="text-sm font-medium">Stock Warning: Some items have insufficient stock.</span>
+                <span className="text-sm font-medium">Some items have insufficient stock. Please add a note below.</span>
               </div>
             )}
 
-            {/* Allow insufficient stock checkbox */}
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="allowInsufficientStock"
-                checked={allowInsufficientStock}
-                onChange={(e) => setAllowInsufficientStock(e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <label htmlFor="allowInsufficientStock" className="text-sm text-gray-700">
-                Allow challan creation with insufficient stock
-              </label>
-            </div>
             {/* FIXED: Proper table structure */}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[600px] border border-gray-200 rounded-lg">
@@ -433,18 +416,17 @@ export function IssueRental() {
                           <input
                             type="number"
                             min="0"
-                            max={allowInsufficientStock ? undefined : stockInfo?.available_quantity}
                             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 text-base ${
-                              isInsufficient && !allowInsufficientStock
-                                ? 'border-orange-300 focus:ring-orange-500 focus:border-orange-500' 
+                              isInsufficient 
+                                ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
                                 : 'border-gray-300 focus:ring-green-500 focus:border-green-500'
                             }`}
                             value={quantities[size] || ''}
                             onChange={(e) => handleQuantityChange(size, e.target.value)}
                             placeholder="0"
                           />
-                          {isInsufficient && !allowInsufficientStock && (
-                            <p className="text-xs text-orange-600 mt-1">
+                          {isInsufficient && (
+                            <p className="text-xs text-red-600 mt-1">
                               Insufficient stock (Available: {stockValidation.find(item => item.size === size)?.available})
                             </p>
                           )}

@@ -74,7 +74,6 @@ export function EnhancedIssueRental() {
   const [challanData, setChallanData] = useState<ChallanData | null>(null);
   const [showClientSelector, setShowClientSelector] = useState(false);
   const [previousDrivers, setPreviousDrivers] = useState<string[]>([]);
-  const [allowInsufficientStock, setAllowInsufficientStock] = useState(false);
 
   useEffect(() => {
     fetchStockData();
@@ -83,20 +82,8 @@ export function EnhancedIssueRental() {
   }, []);
 
   useEffect(() => {
-    if (!allowInsufficientStock) {
-      validateStockAvailability();
-    } else {
-      setStockValidation([]); // Clear validation when allowing insufficient stock
-    }
+    validateStockAvailability();
   }, [quantities, stockData]);
-
-  useEffect(() => {
-    if (allowInsufficientStock) {
-      setStockValidation([]); // Clear validation when checkbox is checked
-    } else {
-      validateStockAvailability(); // Re-validate when checkbox is unchecked
-    }
-  }, [allowInsufficientStock]);
 
   async function fetchPreviousDriverNames() {
     try {
@@ -274,12 +261,9 @@ export function EnhancedIssueRental() {
         return;
       }
 
-      // Only show confirmation for stock issues, don't block
-      if (stockValidation.length > 0 && !allowInsufficientStock) {
-        const confirmMessage = `સ્ટોક ચેતવણી: ${stockValidation.map(v => `${v.size}(${v.requested}>${v.available})`).join(', ')}\n\nશું તમે આગળ વધવા માંગો છો?`;
-        if (!confirm(confirmMessage)) {
-          return;
-        }
+      if (stockValidation.length > 0) {
+        alert('સ્ટોક વેલિડેશન એરર ઠીક કરો.');
+        return;
       }
 
       const { data: challan, error: challanError } = await supabase
@@ -817,29 +801,16 @@ export function EnhancedIssueRental() {
 
               {/* Stock Validation Warnings */}
               {stockValidation.length > 0 && (
-                <div className="flex items-center gap-1 p-1 text-orange-700 border border-orange-200 rounded bg-orange-50">
+                <div className="flex items-center gap-1 p-1 text-red-700 border border-red-200 rounded bg-red-50">
                   <AlertTriangle className="w-3 h-3" />
                   <div className="text-xs">
-                    સ્ટોક ચેતવણી: {stockValidation.map(error => 
+                    સ્ટોક એરર: {stockValidation.map(error => 
                       `${error.size}-${error.type.toUpperCase()}(${error.requested}>${error.available})`
                     ).join(', ')}
                   </div>
                 </div>
               )}
 
-              {/* Allow insufficient stock checkbox */}
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="allowInsufficientStock"
-                  checked={allowInsufficientStock}
-                  onChange={(e) => setAllowInsufficientStock(e.target.checked)}
-                  className="w-3 h-3 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                />
-                <label htmlFor="allowInsufficientStock" className="text-xs text-gray-700">
-                  અપૂરતા સ્ટોક સાથે પણ ચલણ બનાવો
-                </label>
-              </div>
               {/* Enhanced Compact Table */}
               <div className="overflow-x-auto">
                 <table className="w-full overflow-hidden text-xs rounded">
@@ -895,16 +866,16 @@ export function EnhancedIssueRental() {
                             <input
                               type="number"
                               min={0}
-                              max={allowInsufficientStock ? undefined : (stockInfo?.total_quantity || 0)}
+                              max={stockInfo?.total_quantity || 0}
                               value={stockQty.own || ""}
                               onChange={e => handleQuantityChange(size, 'own', e.target.value)}
                               className={`w-8 px-0.5 py-0.5 border rounded text-center ${
-                                isStockInsufficient(size, 'own') && !allowInsufficientStock
-                                  ? 'border-orange-300 bg-orange-50' 
+                                isStockInsufficient(size, 'own') 
+                                  ? 'border-red-300 bg-red-50' 
                                   : 'border-red-300'
                               }`}
                               placeholder="0"
-                              style={{ borderColor: isStockInsufficient(size, 'own') && !allowInsufficientStock ? '#fed7aa' : '#CB4154' }}
+                              style={{ borderColor: isStockInsufficient(size, 'own') ? '#fca5a5' : '#CB4154' }}
                             />
                           </td>
                           
@@ -916,16 +887,16 @@ export function EnhancedIssueRental() {
                             <input
                               type="number"
                               min={0}
-                              max={allowInsufficientStock ? undefined : (stockInfo?.ss || 0)}
+                              max={stockInfo?.ss || 0}
                               value={stockQty.ss || ""}
                               onChange={e => handleQuantityChange(size, 'ss', e.target.value)}
                               className={`w-8 px-0.5 py-0.5 border rounded text-center ${
-                                isStockInsufficient(size, 'ss') && !allowInsufficientStock
-                                  ? 'border-orange-300 bg-orange-50' 
+                                isStockInsufficient(size, 'ss') 
+                                  ? 'border-red-300 bg-red-50' 
                                   : 'border-orange-600'
                               }`}
                               placeholder="0"
-                              style={{ borderColor: isStockInsufficient(size, 'ss') && !allowInsufficientStock ? '#fed7aa' : '#B7410E' }}
+                              style={{ borderColor: isStockInsufficient(size, 'ss') ? '#fca5a5' : '#B7410E' }}
                             />
                           </td>
                           
@@ -937,16 +908,16 @@ export function EnhancedIssueRental() {
                             <input
                               type="number"
                               min={0}
-                              max={allowInsufficientStock ? undefined : (stockInfo?.sk || 0)}
+                              max={stockInfo?.sk || 0}
                               value={stockQty.sk || ""}
                               onChange={e => handleQuantityChange(size, 'sk', e.target.value)}
                               className={`w-8 px-0.5 py-0.5 border rounded text-center ${
-                                isStockInsufficient(size, 'sk') && !allowInsufficientStock
-                                  ? 'border-orange-300 bg-orange-50' 
+                                isStockInsufficient(size, 'sk') 
+                                  ? 'border-red-300 bg-red-50' 
                                   : 'border-orange-300'
                               }`}
                               placeholder="0"
-                              style={{ borderColor: isStockInsufficient(size, 'sk') && !allowInsufficientStock ? '#fed7aa' : '#E2725B' }}
+                              style={{ borderColor: isStockInsufficient(size, 'sk') ? '#fca5a5' : '#E2725B' }}
                             />
                           </td>
                           
@@ -958,16 +929,16 @@ export function EnhancedIssueRental() {
                             <input
                               type="number"
                               min={0}
-                              max={allowInsufficientStock ? undefined : (stockInfo?.etc || 0)}
+                              max={stockInfo?.etc || 0}
                               value={stockQty.etc || ""}
                               onChange={e => handleQuantityChange(size, 'etc', e.target.value)}
                               className={`w-8 px-0.5 py-0.5 border rounded text-center ${
-                                isStockInsufficient(size, 'etc') && !allowInsufficientStock
-                                  ? 'border-orange-300 bg-orange-50' 
+                                isStockInsufficient(size, 'etc') 
+                                  ? 'border-red-300 bg-red-50' 
                                   : 'border-red-800'
                               }`}
                               placeholder="0"
-                              style={{ borderColor: isStockInsufficient(size, 'etc') && !allowInsufficientStock ? '#fed7aa' : '#7C0A02' }}
+                              style={{ borderColor: isStockInsufficient(size, 'etc') ? '#fca5a5' : '#7C0A02' }}
                             />
                           </td>
                           
@@ -1032,20 +1003,20 @@ export function EnhancedIssueRental() {
               {/* Compact Submit Button */}
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || stockValidation.length > 0}
                 className="flex items-center justify-center w-full gap-1 py-2 text-xs font-medium text-white transition-all rounded disabled:opacity-50"
                 style={{ 
-                  background: loading
+                  background: loading || stockValidation.length > 0 
                     ? '#9ca3af' 
                     : 'linear-gradient(to right, #7C0A02, #CC0000)'
                 }}
                 onMouseEnter={e => {
-                  if (!loading) {
+                  if (!loading && stockValidation.length === 0) {
                     e.currentTarget.style.background = 'linear-gradient(to right, #7C0A02, #B7410E)';
                   }
                 }}
                 onMouseLeave={e => {
-                  if (!loading) {
+                  if (!loading && stockValidation.length === 0) {
                     e.currentTarget.style.background = 'linear-gradient(to right, #7C0A02, #CC0000)';
                   }
                 }}

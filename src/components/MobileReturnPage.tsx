@@ -48,7 +48,6 @@ export function MobileReturnPage() {
   const [showClientSelector, setShowClientSelector] = useState(false);
   const [outstandingPlates, setOutstandingPlates] = useState<OutstandingPlates>({});
   const [previousDrivers, setPreviousDrivers] = useState<string[]>([]);
-  const [allowExcessReturn, setAllowExcessReturn] = useState(false);
 
   useEffect(() => { 
     generateNextChallanNumber(); 
@@ -217,8 +216,8 @@ export function MobileReturnPage() {
 
       const validItems = PLATE_SIZES.filter(size => quantities[size] > 0);
       if (validItems.length === 0) {
-        // Allow empty returns - just create the challan record
-        console.log("Creating return challan with no items");
+        alert("ઓછામાં ઓછી એક પ્લેટની માત્રા દાખલ કરો.");
+        return;
       }
 
       const { data: returnRecord, error: returnError } = await supabase
@@ -235,21 +234,18 @@ export function MobileReturnPage() {
 
       if (returnError) throw returnError;
 
-      // Only create line items if there are valid items
-      if (validItems.length > 0) {
-        const lineItems = validItems.map(size => ({
-          return_id: returnRecord.id,
-          plate_size: size,
-          returned_quantity: quantities[size],
-          damage_notes: notes[size]?.trim() || null
-        }));
+      const lineItems = validItems.map(size => ({
+        return_id: returnRecord.id,
+        plate_size: size,
+        returned_quantity: quantities[size],
+        damage_notes: notes[size]?.trim() || null
+      }));
 
-        const { error: lineItemsError } = await supabase
-          .from("return_line_items")
-          .insert(lineItems);
+      const { error: lineItemsError } = await supabase
+        .from("return_line_items")
+        .insert(lineItems);
 
-        if (lineItemsError) throw lineItemsError;
-      }
+      if (lineItemsError) throw lineItemsError;
 
       const newChallanData: ChallanData = {
         type: "return",
@@ -628,18 +624,6 @@ export function MobileReturnPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="allowExcessReturn"
-                  checked={allowExcessReturn}
-                  onChange={(e) => setAllowExcessReturn(e.target.checked)}
-                  className="w-3 h-3 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                />
-                <label htmlFor="allowExcessReturn" className="text-xs text-gray-700">
-                  બાકી કરતાં વધુ પરત કરવાની મંજૂરી આપો
-                </label>
-              </div>
 
               {/* Compact Table - Removed max limitation */}
               <div className="overflow-x-auto">
@@ -656,7 +640,7 @@ export function MobileReturnPage() {
                     {PLATE_SIZES.map((size, index) => {
                       const outstandingCount = outstandingPlates[size] || 0;
                       const returnQuantity = quantities[size] || 0;
-                      const isExcess = returnQuantity > outstandingCount && outstandingCount >= 0;
+                      const isExcess = returnQuantity > outstandingCount;
                       
                       return (
                         <tr key={size} className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}>
@@ -676,17 +660,17 @@ export function MobileReturnPage() {
                             <input
                               type="number"
                               min={0}
-                              max={allowExcessReturn ? undefined : Math.max(0, outstandingCount)}
+                              // Removed max restriction - can return any amount
                               value={quantities[size] || ""}
                               onChange={e => handleQuantityChange(size, e.target.value)}
                               className={`w-12 px-0.5 py-0.5 border rounded text-center ${
-                                isExcess && !allowExcessReturn
+                                isExcess && outstandingCount >= 0
                                   ? 'border-orange-300 bg-orange-50' 
                                   : 'border-gray-300'
                               }`}
                               placeholder="0"
                             />
-                            {isExcess && !allowExcessReturn && (
+                            {isExcess && outstandingCount >= 0 && (
                               <div className="text-xs text-orange-600 mt-0.5">
                                 +{returnQuantity - outstandingCount}
                               </div>

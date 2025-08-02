@@ -64,10 +64,8 @@ export function MobileIssueRental() {
     if (Object.keys(quantities).length > 0) validateStockAvailability(); 
   }, [quantities, stockData]);
 
-  // Remove stock validation that blocks challan creation
+  // Single validateStockAvailability function - shows warnings but doesn't block
   const validateStockAvailability = () => {
-    // Allow creation even with insufficient stock
-    // Just show warnings but don't block
     const warnings: StockValidation[] = [];
     Object.entries(quantities).forEach(([size, quantity]) => {
       if (quantity > 0) {
@@ -152,7 +150,7 @@ export function MobileIssueRental() {
       
       setSuggestedChallanNumber(nextNumber);
       
-      // Auto-fill only if field is empty mk
+      // Auto-fill only if field is empty
       if (!challanNumber) setChallanNumber(nextNumber);
       
     } catch (error) {
@@ -166,23 +164,6 @@ export function MobileIssueRental() {
   function handleChallanNumberChange(value: string) {
     setChallanNumber(value);
     if (!value.trim()) setChallanNumber(suggestedChallanNumber);
-  }
-
-  function validateStockAvailability() {
-    const insufficientStock: StockValidation[] = [];
-    Object.entries(quantities).forEach(([size, quantity]) => {
-      if (quantity > 0) {
-        const stock = stockData.find(s => s.plate_size === size);
-        if (stock && quantity > stock.available_quantity) {
-          insufficientStock.push({
-            size,
-            requested: quantity,
-            available: stock.available_quantity
-          });
-        }
-      }
-    });
-    setStockValidation(insufficientStock);
   }
 
   function handleQuantityChange(size: string, value: string) {
@@ -225,13 +206,14 @@ export function MobileIssueRental() {
         return;
       }
       
-      // Remove stock validation blocking - allow creation with warnings
+      // Allow creation with warnings if allowZeroStock is checked
       if (stockValidation.length > 0 && !allowZeroStock) {
         const confirmMessage = `સ્ટોક ચેતવણી: ${stockValidation.map(v => `${v.size}(${v.requested}>${v.available})`).join(', ')}\n\nશું તમે આગળ વધવા માંગો છો?`;
         if (!confirm(confirmMessage)) {
           return;
         }
       }
+
       const { data: challan, error: challanError } = await supabase
         .from("challans")
         .insert([{
@@ -642,55 +624,56 @@ export function MobileIssueRental() {
               </div>
 
               {/* Compact Form Header */}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                  ચલણ નંબર *
-                </label>
-                <input
-                  type="text"
-                  value={challanNumber}
-                  onChange={(e) => handleChallanNumberChange(e.target.value)}
-                  onFocus={(e) => e.target.select()}
-                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-red-200 focus:border-red-400"
-                  placeholder={suggestedChallanNumber}
-                  required
-                />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                    ચલણ નંબર *
+                  </label>
+                  <input
+                    type="text"
+                    value={challanNumber}
+                    onChange={(e) => handleChallanNumberChange(e.target.value)}
+                    onFocus={(e) => e.target.select()}
+                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-red-200 focus:border-red-400"
+                    placeholder={suggestedChallanNumber}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-0.5">
+                    તારીખ *
+                  </label>
+                  <input
+                    type="date"
+                    value={challanDate}
+                    onChange={(e) => setChallanDate(e.target.value)}
+                    required
+                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-red-200 focus:border-red-400"
+                  />
+                </div>
               </div>
 
-              <div>
+              <div className="mt-2">
                 <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                  તારીખ *
+                  ડ્રાઈવરનું નામ
                 </label>
-                <input
-                  type="date"
-                  value={challanDate}
-                  onChange={(e) => setChallanDate(e.target.value)}
-                  required
-                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-red-200 focus:border-red-400"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={driverName}
+                    onChange={e => setDriverName(e.target.value)}
+                    list="driver-suggestions"
+                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-red-200 focus:border-red-400"
+                    placeholder="ડ્રાઈવરનું નામ દાખલ કરો"
+                  />
+                  <datalist id="driver-suggestions">
+                    {previousDrivers.map((driver, index) => (
+                      <option key={index} value={driver} />
+                    ))}
+                  </datalist>
+                </div>
               </div>
-            </div>
-            <div className="mt-2">
-              <label className="block text-xs font-medium text-gray-700 mb-0.5">
-                ડ્રાઈવરનું નામ
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={driverName}
-                  onChange={e => setDriverName(e.target.value)}
-                  list="driver-suggestions"
-                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-red-200 focus:border-red-400"
-                  placeholder="ડ્રાઈવરનું નામ દાખલ કરો"
-                />
-                <datalist id="driver-suggestions">
-                  {previousDrivers.map((driver, index) => (
-                    <option key={index} value={driver} />
-                  ))}
-                </datalist>
-              </div>
-            </div>
 
               {/* Stock Warning */}
               {stockValidation.length > 0 && (
@@ -712,8 +695,7 @@ export function MobileIssueRental() {
                 <label htmlFor="allowZeroStock" className="text-xs text-gray-700">
                   શૂન્ય સ્ટોક સાથે પણ ચલણ બનાવો
                 </label>
-                </div>
-              )}
+              </div>
 
               {/* Compact Table */}
               <div className="overflow-x-auto">

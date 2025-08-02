@@ -74,6 +74,7 @@ export function EnhancedReturnPage() {
   const [loading, setLoading] = useState(false);
   const [challanData, setChallanData] = useState<ChallanData | null>(null);
   const [showClientSelector, setShowClientSelector] = useState(false);
+  const [allowExcessReturn, setAllowExcessReturn] = useState(false);
 
   useEffect(() => {
     fetchStockData();
@@ -270,6 +271,11 @@ export function EnhancedReturnPage() {
 
       const validItems = PLATE_SIZES.filter(size => getTotalQuantityForSize(size) > 0);
 
+      // Allow empty returns
+      if (validItems.length === 0) {
+        console.log("Creating return challan with no items");
+      }
+
       const { data: returnRecord, error: returnError } = await supabase
         .from('returns')
         .insert([{
@@ -284,6 +290,7 @@ export function EnhancedReturnPage() {
 
       if (returnError) throw returnError;
 
+      // Only create line items if there are valid items
       if (validItems.length > 0) {
         const lineItems = validItems.map(size => {
           const stockQty = quantities[size];
@@ -780,6 +787,20 @@ export function EnhancedReturnPage() {
                 />
               </div>
 
+              {/* Allow excess returns checkbox */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="allowExcessReturn"
+                  checked={allowExcessReturn}
+                  onChange={(e) => setAllowExcessReturn(e.target.checked)}
+                  className="w-3 h-3 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                />
+                <label htmlFor="allowExcessReturn" className="text-xs text-gray-700">
+                  બાકી કરતાં વધુ પરત કરવાની મંજૂરી આપો
+                </label>
+              </div>
+
               {/* Enhanced Compact Table */}
               <div className="overflow-x-auto">
                 <table className="w-full overflow-hidden text-xs rounded">
@@ -839,7 +860,7 @@ export function EnhancedReturnPage() {
                             <input
                               type="number"
                               min={0}
-                              max={outstanding.own}
+                              max={allowExcessReturn ? undefined : outstanding.own}
                               value={stockQty.own || ""}
                               onChange={e => handleQuantityChange(size, 'own', e.target.value)}
                               className="w-8 px-0.5 py-0.5 border rounded text-center border-green-300"
@@ -856,7 +877,7 @@ export function EnhancedReturnPage() {
                             <input
                               type="number"
                               min={0}
-                              max={outstanding.ss}
+                              max={allowExcessReturn ? undefined : outstanding.ss}
                               value={stockQty.ss || ""}
                               onChange={e => handleQuantityChange(size, 'ss', e.target.value)}
                               className="w-8 px-0.5 py-0.5 border rounded text-center"
@@ -873,7 +894,7 @@ export function EnhancedReturnPage() {
                             <input
                               type="number"
                               min={0}
-                              max={outstanding.sk}
+                              max={allowExcessReturn ? undefined : outstanding.sk}
                               value={stockQty.sk || ""}
                               onChange={e => handleQuantityChange(size, 'sk', e.target.value)}
                               className="w-8 px-0.5 py-0.5 border rounded text-center"
@@ -890,7 +911,7 @@ export function EnhancedReturnPage() {
                             <input
                               type="number"
                               min={0}
-                              max={outstanding.etc}
+                              max={allowExcessReturn ? undefined : outstanding.etc}
                               value={stockQty.etc || ""}
                               onChange={e => handleQuantityChange(size, 'etc', e.target.value)}
                               className="w-8 px-0.5 py-0.5 border rounded text-center"

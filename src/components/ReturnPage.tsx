@@ -33,6 +33,7 @@ export function ReturnPage() {
   const [overallNote, setOverallNote] = useState('')
   const [loading, setLoading] = useState(false)
   const [challanData, setChallanData] = useState<ChallanData | null>(null)
+  const [allowExcessReturn, setAllowExcessReturn] = useState(false)
 
   useEffect(() => {
     generateNextChallanNumber()
@@ -140,6 +141,11 @@ export function ReturnPage() {
           damage_notes: overallNote.trim() || null,
           partner_stock_notes: overallNote.trim() || null
         }))
+
+      // Allow empty returns - just create the challan record
+      if (returnEntries.length === 0) {
+        console.log("Creating return challan with no items");
+      }
 
       // Create the return record (even if no line items)
       const { data: returnRecord, error: returnError } = await supabase
@@ -325,6 +331,19 @@ export function ReturnPage() {
                 />
               </div>
             </div>
+            {/* Allow excess returns checkbox */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="allowExcessReturn"
+                checked={allowExcessReturn}
+                onChange={(e) => setAllowExcessReturn(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="allowExcessReturn" className="text-sm text-gray-700">
+                Allow returning more plates than outstanding
+              </label>
+            </div>
 
             {/* Two-Column Responsive Table */}
             <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300">
@@ -352,6 +371,7 @@ export function ReturnPage() {
                         <input
                           type="number"
                           min="0"
+                         max={allowExcessReturn ? undefined : 999}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
                           value={quantities[size] || ''}
                           onChange={(e) => handleQuantityChange(size, e.target.value)}

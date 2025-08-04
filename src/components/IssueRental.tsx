@@ -189,7 +189,8 @@ export function IssueRental() {
       const lineItems = validItems.map(size => ({
         challan_id: challan.id,
         plate_size: size,
-        borrowed_quantity: quantities[size]
+        borrowed_quantity: quantities[size],
+        partner_stock_notes: overallNote || null
       }))
 
       const { error: lineItemsError } = await supabase
@@ -197,6 +198,10 @@ export function IssueRental() {
         .insert(lineItems)
 
       if (lineItemsError) throw lineItemsError
+
+      // Update borrowed stock in stock table if there are borrowed items
+      // Note: This would need to be implemented based on your borrowed stock tracking logic
+      // For now, this is a placeholder for future borrowed stock functionality
 
       // FIXED: Prepare challan data with correct notes
       const newChallanData: ChallanData = {

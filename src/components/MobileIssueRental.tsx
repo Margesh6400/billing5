@@ -225,7 +225,7 @@ export function MobileIssueRental() {
         challan_id: challan.id,
         plate_size: size,
         borrowed_quantity: quantities[size],
-        borrowed_stock: borrowedStock[size] || 0
+        partner_stock_notes: notes[size] || null
       }));
 
       const { error: lineItemsError } = await supabase
@@ -233,6 +233,23 @@ export function MobileIssueRental() {
         .insert(lineItems);
 
       if (lineItemsError) throw lineItemsError;
+
+      // Update borrowed stock in stock table
+      for (const size of validItems) {
+        const borrowedQty = borrowedStock[size] || 0;
+        if (borrowedQty > 0) {
+          const { error: stockError } = await supabase
+            .from('stock')
+            .update({
+              borrowed_stock: supabase.sql`borrowed_stock + ${borrowedQty}`
+            })
+            .eq('plate_size', size);
+
+          if (stockError) {
+            console.error('Error updating borrowed stock:', stockError);
+          }
+        }
+      }
 
       const newChallanData: ChallanData = {
         type: "issue",

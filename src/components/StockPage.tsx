@@ -269,6 +269,19 @@ export function StockPage() {
                     </p>
                   </div>
                 </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Borrowed Stock (Reference Only)
+                  </label>
+                  <p className="text-2xl font-bold text-orange-600">
+                    {item.borrowed_stock || 0}
+                    <div className="text-xs text-gray-400">From partners</div>
+                  </p>
+                </div>
+              </div>
 
                 <div className="grid grid-cols-1 gap-4">
                   <div>

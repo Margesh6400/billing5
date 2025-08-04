@@ -7,6 +7,7 @@ import { PrintableChallan } from './challans/PrintableChallan'
 import { generateJPGChallan, downloadJPGChallan } from '../utils/jpgChallanGenerator'
 import { ChallanData } from './challans/types'
 import { useAuth } from '../hooks/useAuth'
+import { updateBorrowedStock } from '../utils/stockHelpers';
 
 type Client = Database['public']['Tables']['clients']['Row']
 type Stock = Database['public']['Tables']['stock']['Row']
@@ -190,7 +191,8 @@ export function IssueRental() {
         challan_id: challan.id,
         plate_size: size,
         borrowed_quantity: quantities[size],
-        partner_stock_notes: overallNote || null
+        partner_stock_notes: overallNote || null,
+        borrowed_stock: 0 // Desktop version doesn't track borrowed stock yet
       }))
 
       const { error: lineItemsError } = await supabase
@@ -198,10 +200,6 @@ export function IssueRental() {
         .insert(lineItems)
 
       if (lineItemsError) throw lineItemsError
-
-      // Update borrowed stock in stock table if there are borrowed items
-      // Note: This would need to be implemented based on your borrowed stock tracking logic
-      // For now, this is a placeholder for future borrowed stock functionality
 
       // FIXED: Prepare challan data with correct notes
       const newChallanData: ChallanData = {

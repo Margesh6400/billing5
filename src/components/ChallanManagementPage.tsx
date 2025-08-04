@@ -9,6 +9,7 @@ import { generateJPGChallan, downloadJPGChallan } from '../utils/jpgChallanGener
 import { PrintableChallan } from './challans/PrintableChallan';
 import { ChallanData } from './challans/types';
 import { useAuth } from '../hooks/useAuth';
+import { recalculateAllBorrowedStock } from '../utils/stockHelpers';
 
 const PLATE_SIZES = [
   '2 X 3',
@@ -301,6 +302,14 @@ export function ChallanManagementPage() {
 
       setEditingChallan(null);
       await fetchChallans();
+      
+      // Recalculate borrowed stock after editing challan
+      try {
+        await recalculateAllBorrowedStock();
+      } catch (error) {
+        console.error('Error recalculating borrowed stock:', error);
+      }
+      
       alert('ચલણ સફળતાપૂર્વક અપડેટ થયું!');
     } catch (error) {
       console.error('Error updating challan:', error);
@@ -336,6 +345,14 @@ export function ChallanManagementPage() {
 
       setEditingChallan(null);
       await fetchChallans();
+      
+      // Recalculate borrowed stock after deleting challan
+      try {
+        await recalculateAllBorrowedStock();
+      } catch (error) {
+        console.error('Error recalculating borrowed stock:', error);
+      }
+      
       alert('ચલણ સફળતાપૂર્વક ડિલીટ થયું!');
     } catch (error) {
       console.error('Error deleting challan:', error);

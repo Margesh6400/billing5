@@ -51,6 +51,7 @@ export type Database = {
           total_quantity: number
           available_quantity: number
           on_rent_quantity: number
+          borrowed_stock: number
           updated_at: string
         }
         Insert: {
@@ -59,6 +60,7 @@ export type Database = {
           total_quantity?: number
           available_quantity?: number
           on_rent_quantity?: number
+          borrowed_stock?: number
           updated_at?: string
         }
         Update: {
@@ -67,6 +69,7 @@ export type Database = {
           total_quantity?: number
           available_quantity?: number
           on_rent_quantity?: number
+          borrowed_stock?: number
           updated_at?: string
         }
       }

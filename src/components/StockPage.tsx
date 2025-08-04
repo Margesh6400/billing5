@@ -332,6 +332,16 @@ export function StockPage() {
           <p className="text-sm text-gray-400 mt-1">Add your first plate size to get started</p>
         </div>
       )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Borrowed Stock (Auto-calculated)
+                  </label>
+                  <p className="text-2xl font-bold text-orange-600">
+                    {item.borrowed_stock || 0}
+                    <div className="text-xs text-gray-400">From partner stock</div>
+                  </p>
+                </div>
+                
     </div>
   )
 }

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { generateJPGChallan, downloadJPGChallan } from "../utils/jpgChallanGenerator";
 import { ChallanData } from "./challans/types";
+import { updateBorrowedStock } from '../utils/stockHelpers';
 
 type Client = Database["public"]["Tables"]["clients"]["Row"];
 type Stock = Database["public"]["Tables"]["stock"]["Row"];
@@ -225,6 +226,7 @@ export function MobileIssueRental() {
         challan_id: challan.id,
         plate_size: size,
         borrowed_quantity: quantities[size],
+        partner_stock_notes: notes[size] || null,
         borrowed_stock: borrowedStock[size] || 0
       }));
 
@@ -233,6 +235,18 @@ export function MobileIssueRental() {
         .insert(lineItems);
 
       if (lineItemsError) throw lineItemsError;
+
+      // Update borrowed stock in stock table - aggregate totals
+      for (const size of validItems) {
+        const borrowedQty = borrowedStock[size] || 0;
+        if (borrowedQty > 0) {
+          try {
+            await updateBorrowedStock(size, borrowedQty);
+          } catch (error) {
+            console.error('Error updating borrowed stock for', size, ':', error);
+          }
+        }
+      }
 
       const newChallanData: ChallanData = {
         type: "issue",

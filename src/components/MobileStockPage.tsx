@@ -110,6 +110,12 @@ function StockRow({ plateSize, stockData, onUpdate, isAdmin }: StockRowProps) {
           <td className="px-2 py-1.5 text-center font-medium text-blue-600 text-xs">
             {stockData?.on_rent_quantity || 0}
           </td>
+          <td className="px-2 py-1.5 text-center font-medium text-orange-600 text-xs">
+            {stockData?.borrowed_stock || 0}
+          </td>
+          <td className="px-2 py-1.5 text-center font-medium text-orange-600 text-xs">
+            {stockData?.borrowed_stock || 0}
+          </td>
           <td className="px-2 py-1.5">
             {isAdmin ? (
               <button
@@ -292,6 +298,9 @@ export function MobileStockPage() {
                     ભાડે આપેલ
                   </th>
                   <th className="px-2 py-2 font-bold text-center text-blue-900">
+                    ઉધાર લીધેલ
+                  </th>
+                  <th className="px-2 py-2 font-bold text-center text-blue-900">
                     ક્રિયા
                   </th>
                 </tr>
@@ -325,6 +334,14 @@ export function MobileStockPage() {
                   </td>
                   <td className="px-2 py-2 text-sm font-bold text-center text-blue-800 border-r border-green-200 bg-blue-50">
                     {totals.totalOnRent}
+                  </td>
+                  <td className="px-2 py-2 text-center border-r border-green-200">
+                    <span className="px-2 py-1 text-sm font-bold text-orange-800 bg-orange-200 rounded-full">
+                      {filteredPlateSizes
+                        .map(size => stockMap[size])
+                        .filter(Boolean)
+                        .reduce((sum, item) => sum + (item?.borrowed_stock || 0), 0)}
+                    </span>
                   </td>
                   <td className="px-2 py-2 text-xs font-medium text-center text-green-700">
                     -

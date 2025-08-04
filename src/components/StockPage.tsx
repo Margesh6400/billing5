@@ -241,7 +241,7 @@ export function StockPage() {
               </div>
 
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Available (Auto-calculated)
@@ -266,6 +266,16 @@ export function StockPage() {
                     <p className="text-2xl font-bold text-blue-600">
                       {item.on_rent_quantity}
                       <div className="text-xs text-gray-400">From transactions</div>
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Borrowed (Reference Only)
+                    </label>
+                    <p className="text-2xl font-bold text-orange-600">
+                      {item.borrowed_stock || 0}
+                      <div className="text-xs text-gray-400">From partners</div>
                     </p>
                   </div>
                 </div>

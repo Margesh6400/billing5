@@ -7,6 +7,7 @@ import { PrintableChallan } from './challans/PrintableChallan'
 import { generateJPGChallan, downloadJPGChallan } from '../utils/jpgChallanGenerator'
 import { ChallanData } from './challans/types'
 import { useAuth } from '../hooks/useAuth'
+import { updateBorrowedStock } from '../utils/stockHelpers';
 
 type Client = Database['public']['Tables']['clients']['Row']
 type Stock = Database['public']['Tables']['stock']['Row']
@@ -189,7 +190,9 @@ export function IssueRental() {
       const lineItems = validItems.map(size => ({
         challan_id: challan.id,
         plate_size: size,
-        borrowed_quantity: quantities[size]
+        borrowed_quantity: quantities[size],
+        partner_stock_notes: overallNote || null,
+        borrowed_stock: 0 // Desktop version doesn't track borrowed stock yet
       }))
 
       const { error: lineItemsError } = await supabase

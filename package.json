@@ -19,6 +19,12 @@
     "mobile:build:ios": "npm run mobile:sync && npx cap build ios"
   },
   "dependencies": {
+    "@capacitor/app": "^7.0.1",
+    "@capacitor/core": "^7.4.2",
+    "@capacitor/haptics": "^7.0.1",
+    "@capacitor/keyboard": "^7.0.1",
+    "@capacitor/splash-screen": "^7.0.1",
+    "@capacitor/status-bar": "^7.0.1",
     "@fontsource/noto-sans-gujarati": "5.2.6",
     "@react-pdf/renderer": "4.3.0",
     "@supabase/supabase-js": "2.52.0",

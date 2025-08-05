@@ -112,7 +112,7 @@ export function MobileReturnRental() {
     if (!selectedClient) return;
     
     try {
-      // Get all issued plates for this client
+      // Get all issued plates for this client1
       const { data: challans } = await supabase
         .from("challans")
         .select("challan_items (plate_size, borrowed_quantity)")

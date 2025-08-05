@@ -33,7 +33,11 @@ interface OutstandingPlates {
   [key: string]: number;
 }
 
-export function MobileReturnPage() {
+interface BorrowedStockData {
+  [key: string]: number;
+}
+
+export function MobileReturnRental() {
   const { user } = useAuth();
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [returnChallanNumber, setReturnChallanNumber] = useState("");
@@ -44,10 +48,12 @@ export function MobileReturnPage() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [damagedQuantities, setDamagedQuantities] = useState<Record<string, number>>({});
   const [lostQuantities, setLostQuantities] = useState<Record<string, number>>({});
+  const [borrowedStockReturns, setBorrowedStockReturns] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [challanData, setChallanData] = useState<ChallanData | null>(null);
   const [showClientSelector, setShowClientSelector] = useState(false);
   const [outstandingPlates, setOutstandingPlates] = useState<OutstandingPlates>({});
+  const [outstandingBorrowedStock, setOutstandingBorrowedStock] = useState<BorrowedStockData>({});
   const [previousDrivers, setPreviousDrivers] = useState<string[]>([]);
   const [stockData, setStockData] = useState<Stock[]>([]);
 
@@ -58,7 +64,10 @@ export function MobileReturnPage() {
   }, []);
   
   useEffect(() => { 
-    if (selectedClient) fetchOutstandingPlates(); 
+    if (selectedClient) {
+      fetchOutstandingPlates();
+      fetchOutstandingBorrowedStock();
+    }
   }, [selectedClient]);
 
   async function fetchStockData() {
@@ -103,7 +112,7 @@ export function MobileReturnPage() {
     if (!selectedClient) return;
     
     try {
-      // Get all issued plates for this client
+      // Get all issued plates for this client1
       const { data: challans } = await supabase
         .from("challans")
         .select("challan_items (plate_size, borrowed_quantity)")
@@ -135,6 +144,50 @@ export function MobileReturnPage() {
     } catch (error) {
       console.error("Error fetching outstanding plates:", error);
       setOutstandingPlates({});
+    }
+  }
+
+  async function fetchOutstandingBorrowedStock() {
+    if (!selectedClient) return;
+    
+    try {
+      // Get all borrowed stock for this client from active challans
+      const { data: challans } = await supabase
+        .from("challans")
+        .select("challan_items (plate_size, borrowed_stock)")
+        .eq("client_id", selectedClient.id)
+        .eq("status", "active");
+
+      // Get all returned borrowed stock for this client
+      const { data: returns } = await supabase
+        .from("returns")
+        .select("return_line_items (plate_size, returned_borrowed_stock)")
+        .eq("client_id", selectedClient.id);
+
+      const outstandingBorrowed: BorrowedStockData = {};
+      
+      // Add borrowed stock quantities
+      challans?.forEach((challan) => {
+        challan.challan_items.forEach(item => {
+          if (item.borrowed_stock > 0) {
+            outstandingBorrowed[item.plate_size] = (outstandingBorrowed[item.plate_size] || 0) + item.borrowed_stock;
+          }
+        });
+      });
+
+      // Subtract returned borrowed stock quantities
+      returns?.forEach((returnRecord) => {
+        returnRecord.return_line_items.forEach(item => {
+          if (item.returned_borrowed_stock > 0) {
+            outstandingBorrowed[item.plate_size] = (outstandingBorrowed[item.plate_size] || 0) - item.returned_borrowed_stock;
+          }
+        });
+      });
+
+      setOutstandingBorrowedStock(outstandingBorrowed);
+    } catch (error) {
+      console.error("Error fetching outstanding borrowed stock:", error);
+      setOutstandingBorrowedStock({});
     }
   }
 
@@ -195,6 +248,11 @@ export function MobileReturnPage() {
   function handleLostQuantityChange(size: string, value: string) {
     const quantity = parseInt(value) || 0;
     setLostQuantities(prev => ({ ...prev, [size]: quantity }));
+  }
+
+  function handleBorrowedStockReturnChange(size: string, value: string) {
+    const quantity = parseInt(value) || 0;
+    setBorrowedStockReturns(prev => ({ ...prev, [size]: quantity }));
   }
 
   function handleNoteChange(size: string, value: string) {
@@ -283,13 +341,14 @@ export function MobileReturnPage() {
 
       if (returnError) throw returnError;
 
-      // Create return line items
+      // Create return line items with borrowed stock tracking
       const lineItems = validItems.map(size => ({
         return_id: returnRecord.id,
         plate_size: size,
         returned_quantity: quantities[size],
         damaged_quantity: damagedQuantities[size] || 0,
         lost_quantity: lostQuantities[size] || 0,
+        returned_borrowed_stock: borrowedStockReturns[size] || 0,
         damage_notes: notes[size]?.trim() || null
       }));
 
@@ -335,11 +394,13 @@ export function MobileReturnPage() {
       setNotes({});
       setDamagedQuantities({});
       setLostQuantities({});
+      setBorrowedStockReturns({});
       setReturnChallanNumber("");
       setSelectedClient(null);
       setChallanData(null);
       setShowClientSelector(false);
       setOutstandingPlates({});
+      setOutstandingBorrowedStock({});
       setDriverName("");
 
       alert(`જમા ચલણ ${returnRecord.return_challan_number} સફળતાપૂર્વક બનાવવામાં આવ્યું અને ડાઉનલોડ થયું!`);
@@ -723,7 +784,7 @@ export function MobileReturnPage() {
                 </div>
               </div>
 
-              {/* Enhanced Table with Damage/Loss tracking */}
+              {/* Enhanced Table with Borrowed Stock tracking */}
               <div className="overflow-x-auto">
                 <table className="w-full overflow-hidden text-xs rounded">
                   <thead>
@@ -731,6 +792,8 @@ export function MobileReturnPage() {
                       <th className="px-1 py-1 font-medium text-left">સાઇઝ</th>
                       <th className="px-1 py-1 font-medium text-center">બાકી</th>
                       <th className="px-1 py-1 font-medium text-center">પરત</th>
+                      <th className="px-1 py-1 font-medium text-center">ઉધાર બાકી</th>
+                      <th className="px-1 py-1 font-medium text-center">ઉધાર પરત</th>
                       <th className="px-1 py-1 font-medium text-center">ખરાબ</th>
                       <th className="px-1 py-1 font-medium text-center">ગુમ</th>
                       <th className="px-1 py-1 font-medium text-center">નોંધ</th>
@@ -739,14 +802,17 @@ export function MobileReturnPage() {
                   <tbody>
                     {PLATE_SIZES.map((size, index) => {
                       const outstandingCount = outstandingPlates[size] || 0;
+                      const outstandingBorrowedCount = outstandingBorrowedStock[size] || 0;
                       const returnQuantity = quantities[size] || 0;
                       const damagedQuantity = damagedQuantities[size] || 0;
                       const lostQuantity = lostQuantities[size] || 0;
+                      const borrowedStockReturn = borrowedStockReturns[size] || 0;
                       const totalProcessed = returnQuantity + damagedQuantity + lostQuantity;
                       const isExcess = totalProcessed > outstandingCount;
+                      const isBorrowedExcess = borrowedStockReturn > outstandingBorrowedCount;
                       
                       return (
-                        <tr key={size} className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} ${isExcess && outstandingCount > 0 ? 'bg-orange-50' : ''}`}>
+                        <tr key={size} className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} ${(isExcess && outstandingCount > 0) || (isBorrowedExcess && outstandingBorrowedCount > 0) ? 'bg-orange-50' : ''}`}>
                           <td className="px-1 py-1 font-medium">{size}</td>
                           <td className="px-1 py-1 text-center">
                             <span className={`inline-flex items-center justify-center w-5 h-5 font-bold rounded ${
@@ -769,6 +835,29 @@ export function MobileReturnPage() {
                                 isExcess && outstandingCount >= 0
                                   ? 'border-orange-300 bg-orange-50' 
                                   : 'border-gray-300'
+                              }`}
+                              placeholder="0"
+                            />
+                          </td>
+                          <td className="px-1 py-1 text-center">
+                            <span className={`inline-flex items-center justify-center w-5 h-5 font-bold rounded ${
+                              outstandingBorrowedCount > 0 
+                                ? 'text-purple-700 bg-purple-100' 
+                                : 'text-gray-700 bg-gray-100'
+                            }`}>
+                              {outstandingBorrowedCount}
+                            </span>
+                          </td>
+                          <td className="px-1 py-1 text-center">
+                            <input
+                              type="number"
+                              min={0}
+                              value={borrowedStockReturns[size] || ""}
+                              onChange={e => handleBorrowedStockReturnChange(size, e.target.value)}
+                              className={`w-10 px-0.5 py-0.5 border rounded text-center ${
+                                isBorrowedExcess && outstandingBorrowedCount >= 0
+                                  ? 'border-orange-300 bg-orange-50' 
+                                  : 'border-purple-300 bg-purple-50'
                               }`}
                               placeholder="0"
                             />
@@ -809,14 +898,20 @@ export function MobileReturnPage() {
                 </table>
               </div>
 
-              {/* Enhanced Total with breakdown */}
+              {/* Enhanced Total with borrowed stock breakdown */}
               <div className="p-2 bg-green-100 border border-green-200 rounded">
                 <div className="text-center space-y-1">
-                  <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="grid grid-cols-4 gap-2 text-xs">
                     <div>
                       <span className="font-medium text-green-800">પરત: </span>
                       <span className="text-sm font-bold text-green-700">
                         {Object.values(quantities).reduce((sum, qty) => sum + (qty || 0), 0)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-purple-800">ઉધાર પરત: </span>
+                      <span className="text-sm font-bold text-purple-700">
+                        {Object.values(borrowedStockReturns).reduce((sum, qty) => sum + (qty || 0), 0)}
                       </span>
                     </div>
                     <div>
@@ -836,6 +931,7 @@ export function MobileReturnPage() {
                     <span className="font-medium text-green-800">કુલ પ્રક્રિયા: </span>
                     <span className="text-base font-bold text-green-700">
                       {Object.values(quantities).reduce((sum, qty) => sum + (qty || 0), 0) +
+                       Object.values(borrowedStockReturns).reduce((sum, qty) => sum + (qty || 0), 0) +
                        Object.values(damagedQuantities).reduce((sum, qty) => sum + (qty || 0), 0) +
                        Object.values(lostQuantities).reduce((sum, qty) => sum + (qty || 0), 0)}
                     </span>

@@ -129,6 +129,13 @@ function StockRow({ plateSize, stockData, borrowedStock, damageData, onUpdate, i
         </span>
       </td>
 
+      {/* Outstanding Borrowed Stock */}
+      <td className="px-1.5 py-2 text-center border-r border-blue-100">
+        <span className="px-1.5 py-0.5 rounded-full text-[12px] font-medium bg-purple-100 text-purple-700 border border-purple-200">
+          {outstandingBorrowedStock}
+        </span>
+      </td>
+
       {/* Damage/Loss */}
       <td className="px-1.5 py-2 text-center border-r border-blue-100">
         <div className="flex flex-col items-center">

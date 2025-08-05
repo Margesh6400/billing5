@@ -6,7 +6,7 @@ import { AuthForm } from './components/AuthForm'
 import { MobileLayout } from './components/MobileLayout'
 import { MobileDashboard } from './components/MobileDashboard'
 import { MobileIssueRental } from './components/MobileIssueRental'
-import { MobileReturnPage } from './components/MobileReturnPage'
+import { MobileReturnRental } from './components/MobileReturnRental'
 import { MobileClientsPage } from './components/MobileClientsPage'
 import { MobileStockPage } from './components/MobileStockPage'
 import { MobileLedgerPage } from './components/mobile/MobileLedgerPage'
@@ -41,7 +41,7 @@ function App() {
         <Routes>
           <Route path="/" element={<MobileDashboard />} />
           <Route path="/issue" element={<MobileIssueRental />} />
-          <Route path="/return" element={<MobileReturnPage />} />
+          <Route path="/return" element={<MobileReturnRental />} />
           <Route path="/clients" element={<MobileClientsPage />} />
           <Route path="/stock" element={<MobileStockPage />} />
           <Route path="/ledger" element={<MobileLedgerPage />} />

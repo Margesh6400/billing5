@@ -33,12 +33,13 @@ interface StockRowProps {
   plateSize: string;
   stockData: Stock | undefined;
   borrowedStock: number;
+  outstandingBorrowedStock: number;
   damageData: { damaged: number; lost: number };
   onUpdate: (plateSize: string, values: Partial<Stock>) => Promise<void>;
   isAdmin: boolean;
 }
 
-function StockRow({ plateSize, stockData, borrowedStock, damageData, onUpdate, isAdmin }: StockRowProps) {
+function StockRow({ plateSize, stockData, borrowedStock, outstandingBorrowedStock, damageData, onUpdate, isAdmin }: StockRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValues, setEditValues] = useState({
     total_quantity: stockData?.total_quantity || 0
@@ -126,6 +127,13 @@ function StockRow({ plateSize, stockData, borrowedStock, damageData, onUpdate, i
       <td className="px-1.5 py-2 text-center border-r border-blue-100">
         <span className="px-1.5 py-0.5 rounded-full text-[12px] font-medium bg-orange-100 text-orange-700 border border-orange-200">
           {borrowedStock}
+        </span>
+      </td>
+
+      {/* Outstanding Borrowed */}
+      <td className="px-1.5 py-2 text-center border-r border-blue-100">
+        <span className="px-1.5 py-0.5 rounded-full text-[12px] font-medium bg-purple-100 text-purple-700 border border-purple-200">
+          {outstandingBorrowedStock}
         </span>
       </td>
 
@@ -354,6 +362,9 @@ export function MobileStockPage() {
                   <th className="w-12 px-1.5 py-1.5 text-[12px] font-bold text-center text-blue-900 border-r border-blue-200">
                     બીજો ડેપો
                   </th>
+                  <th className="px-1.5 py-1.5 text-[12px] font-bold text-center text-blue-900 border-r border-blue-200">
+                    ઉધાર બાકી
+                  </th>
                   <th className="w-8 px-1.5 py-1.5 text-[12px] font-bold text-center text-blue-900">
                     ઉમેરો
                   </th>
@@ -366,6 +377,8 @@ export function MobileStockPage() {
                     plateSize={plateSize}
                     stockData={stockMap[plateSize]}
                     borrowedStock={borrowedStockMap[plateSize] || 0}
+                    outstandingBorrowedStock={borrowedStockData.find(b => b.plate_size === plateSize)?.outstanding_borrowed || 0}
+                    damageData={{ damaged: 0, lost: 0 }}
                     onUpdate={handleUpdateStock}
                     isAdmin={user?.isAdmin || false}
                   />
@@ -400,6 +413,11 @@ export function MobileStockPage() {
                   <td className="px-1.5 py-2 text-center border-r border-green-200">
                     <span className="px-1.5 py-0.5 text-[12px] font-bold text-orange-700 bg-orange-200 rounded-full border border-orange-300">
                       {totals.totalBorrowedStock}
+                    </span>
+                  </td>
+                  <td className="px-1.5 py-2 text-center border-r border-green-200">
+                    <span className="px-1.5 py-0.5 text-[12px] font-bold text-purple-700 bg-purple-200 rounded-full border border-purple-300">
+                      {borrowedStockData.reduce((sum, item) => sum + item.outstanding_borrowed, 0)}
                     </span>
                   </td>
                   <td className="px-1.5 py-2 text-center">

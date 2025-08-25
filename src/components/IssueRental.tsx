@@ -7,7 +7,6 @@ import { PrintableChallan } from './challans/PrintableChallan'
 import { generateJPGChallan, downloadJPGChallan } from '../utils/jpgChallanGenerator'
 import { ChallanData } from './challans/types'
 import { useAuth } from '../hooks/useAuth'
-import { ChallanService } from '../services/challanService'
 
 type Client = Database['public']['Tables']['clients']['Row']
 type Stock = Database['public']['Tables']['stock']['Row']
@@ -161,20 +160,9 @@ export function IssueRental() {
         return
       }
 
-      // Prepare plate data for service
-      const plateData: Record<string, { quantity: number; borrowedStock: number; notes: string }> = {};
-      PLATE_SIZES.forEach(size => {
-        plateData[size] = {
-          quantity: quantities[size] || 0,
-          borrowedStock: 0, // No borrowed stock in desktop version
-          notes: overallNote || ''
-        };
-      });
-
-      // Check if any plates have quantities
-      const hasValidPlates = Object.values(plateData).some(data => data.quantity > 0);
+      const validItems = PLATE_SIZES.filter(size => quantities[size] > 0)
       
-      if (!hasValidPlates) {
+      if (validItems.length === 0) {
         alert('Please enter at least one plate quantity.')
         return
       }
@@ -186,25 +174,34 @@ export function IssueRental() {
         }
       }
 
-      // Use the service to create challan
-      const result = await ChallanService.createChallan(
-        'udhar',
-        challanNumber,
-        challanDate,
-        selectedClient!.id,
-        '', // No driver name in desktop version
-        plateData
-      );
+      const { data: challan, error: challanError } = await supabase
+        .from('challans')
+        .insert([{
+          challan_number: challanNumber,
+          client_id: selectedClient!.id,
+          challan_date: challanDate
+        }])
+        .select()
+        .single()
 
-      if (!result.success) {
-        alert(`Error creating challan: ${result.error}`);
-        return;
-      }
+      if (challanError) throw challanError
+
+      const lineItems = validItems.map(size => ({
+        challan_id: challan.id,
+        plate_size: size,
+        borrowed_quantity: quantities[size]
+      }))
+
+      const { error: lineItemsError } = await supabase
+        .from('challan_items')
+        .insert(lineItems)
+
+      if (lineItemsError) throw lineItemsError
 
       // FIXED: Prepare challan data with correct notes
       const newChallanData: ChallanData = {
         type: 'issue',
-        challan_number: challanNumber,
+        challan_number: challan.challan_number,
         date: challanDate,
         client: {
           id: selectedClient!.id,
@@ -212,14 +209,12 @@ export function IssueRental() {
           site: selectedClient!.site || '',
           mobile: selectedClient!.mobile_number || ''
         },
-        plates: Object.entries(plateData)
-          .filter(([_, data]) => data.quantity > 0)
-          .map(([size, data]) => ({
+        plates: validItems.map(size => ({
           size,
-          quantity: data.quantity,
-          notes: data.notes,
+          quantity: quantities[size],
+          notes: overallNote || '',
         })),
-        total_quantity: Object.values(plateData).reduce((sum, data) => sum + data.quantity, 0)
+        total_quantity: validItems.reduce((sum, size) => sum + quantities[size], 0)
       };
 
       setChallanData(newChallanData);
@@ -229,7 +224,7 @@ export function IssueRental() {
 
       try {
         const jpgDataUrl = await generateJPGChallan(newChallanData);
-        downloadJPGChallan(jpgDataUrl, `issue-challan-${challanNumber}`);
+        downloadJPGChallan(jpgDataUrl, `issue-challan-${challan.challan_number}`);
 
         setQuantities({})
         setOverallNote('')
@@ -238,7 +233,7 @@ export function IssueRental() {
         setStockValidation([])
         setChallanData(null)
         
-        alert(`Challan ${challanNumber} created and downloaded successfully!`)
+        alert(`Challan ${challan.challan_number} created and downloaded successfully!`)
         await fetchStockData()
       } catch (error) {
         console.error('JPG generation failed:', error);

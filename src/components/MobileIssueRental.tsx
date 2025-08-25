@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import { generateJPGChallan, downloadJPGChallan } from "../utils/jpgChallanGenerator";
 import { ChallanData } from "./challans/types";
-import { ChallanService } from "../services/challanService";
 
 type Client = Database["public"]["Tables"]["clients"]["Row"];
 type Stock = Database["public"]["Tables"]["stock"]["Row"];
@@ -257,45 +256,71 @@ export function MobileIssueRental() {
         return;
       }
 
-      // Prepare plate data for service
-      const plateData: Record<string, { quantity: number; borrowedStock: number; notes: string }> = {};
-      PLATE_SIZES.forEach(size => {
-        plateData[size] = {
-          quantity: quantities[size] || 0,
-          borrowedStock: borrowedStock[size] || 0,
-          notes: notes[size] || ''
-        };
-      });
-
-      // Check if any plates have quantities
-      const hasValidPlates = Object.values(plateData).some(
-        data => data.quantity > 0 || data.borrowedStock > 0
+      const validItems = PLATE_SIZES.filter(size => 
+        (quantities[size] > 0) || (borrowedStock[size] > 0)
       );
       
-      if (!hasValidPlates) {
+      if (validItems.length === 0) {
         alert("ઓછામાં ઓછી એક પ્લેટની માત્રા અથવા બિજો ડેપો માત્રા દાખલ કરો.");
         return;
       }
 
-      // Use the service to create challan
-      const result = await ChallanService.createChallan(
-        'udhar',
-        challanNumber,
-        challanDate,
-        selectedClient!.id,
-        driverName,
-        plateData
-      );
+      // Create challan
+      const { data: challan, error: challanError } = await supabase
+        .from("challans")
+        .insert([{
+          challan_number: challanNumber,
+          client_id: selectedClient!.id,
+          challan_date: challanDate,
+          driver_name: driverName || null
+        }])
+        .select()
+        .single();
 
-      if (!result.success) {
-        alert(`ચલણ બનાવવામાં ભૂલ: ${result.error}`);
-        return;
-      }
+      if (challanError) throw challanError;
+
+      // Create line items
+      const lineItems = validItems.map(size => ({
+        challan_id: challan.id,
+        plate_size: size,
+        borrowed_quantity: quantities[size] || 0,
+        borrowed_stock: borrowedStock[size] || 0,
+        partner_stock_notes: notes[size]?.trim() || null
+      }));
+
+      const { error: lineItemsError } = await supabase
+        .from("challan_items")
+        .insert(lineItems);
+
+      if (lineItemsError) throw lineItemsError;
+
+      // Update stock quantities
+      const stockUpdates = validItems
+        .filter(size => quantities[size] > 0)
+        .map(async (size) => {
+          const regularQuantity = quantities[size];
+          const stockItem = stockData.find(s => s.plate_size === size);
+          if (stockItem) {
+            const newAvailableQuantity = Math.max(0, stockItem.available_quantity - regularQuantity);
+            const newOnRentQuantity = stockItem.on_rent_quantity + regularQuantity;
+            
+            return supabase
+              .from('stock')
+              .update({
+                available_quantity: newAvailableQuantity,
+                on_rent_quantity: newOnRentQuantity,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', stockItem.id);
+          }
+        });
+
+      await Promise.all(stockUpdates.filter(Boolean));
 
       // Generate and download challan
       const newChallanData: ChallanData = {
         type: "issue",
-        challan_number: challanNumber,
+        challan_number: challan.challan_number,
         date: challanDate,
         client: {
           id: selectedClient!.id,
@@ -304,17 +329,17 @@ export function MobileIssueRental() {
           mobile: selectedClient!.mobile_number || ""
         },
         driver_name: driverName,
-        plates: Object.entries(plateData)
-          .filter(([_, data]) => data.quantity > 0 || data.borrowedStock > 0)
-          .map(([size, data]) => {
+        plates: validItems.map(size => {
+          const regularQty = quantities[size] || 0;
+          const borrowedQty = borrowedStock[size] || 0;
           return {
             size,
-            quantity: data.quantity,
-            borrowed_stock: data.borrowedStock,
-            notes: data.notes,
+            quantity: regularQty,
+            borrowed_stock: borrowedQty,
+            notes: notes[size] || "",
           };
         }),
-        total_quantity: Object.values(plateData).reduce((sum, data) => sum + data.quantity, 0)
+        total_quantity: validItems.reduce((sum, size) => sum + (quantities[size] || 0), 0)
       };
 
       setChallanData(newChallanData);
@@ -334,7 +359,7 @@ export function MobileIssueRental() {
       setChallanData(null);
       setShowClientSelector(false);
 
-      showToast("ચલણ સફળતાપૂર્વક બનાવવામાં આવ્યું!", true, challanNumber);
+      showToast("ચલણ સફળતાપૂર્વક બનાવવામાં આવ્યું!", true, challan.challan_number);
       await fetchStockData();
       await generateNextChallanNumber();
     } catch (error) {

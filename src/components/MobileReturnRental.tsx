@@ -26,7 +26,6 @@ import {
 } from "lucide-react";
 import { generateJPGChallan, downloadJPGChallan } from "../utils/jpgChallanGenerator";
 import { ChallanData } from "./challans/types";
-import { ChallanService } from "../services/challanService";
 
 type Client = Database["public"]["Tables"]["clients"]["Row"];
 type Stock = Database["public"]["Tables"]["stock"]["Row"];
@@ -382,7 +381,34 @@ export function MobileReturnRental() {
 
   async function updateStockAfterReturn() {
     try {
-      // This function is no longer needed as stock updates are handled by the service
+      // Update stock quantities for returned plates
+      for (const [plateSize, returnedQty] of Object.entries(quantities)) {
+        if (returnedQty > 0) {
+          const stockItem = stockData.find(s => s.plate_size === plateSize);
+          if (stockItem) {
+            const damagedQty = damagedQuantities[plateSize] || 0;
+            const lostQty = lostQuantities[plateSize] || 0;
+            const goodReturnedQty = returnedQty - damagedQty - lostQty;
+            
+            // Update stock: add good returned plates back to available stock
+            const newAvailableQuantity = stockItem.available_quantity + goodReturnedQty;
+            const newOnRentQuantity = Math.max(0, stockItem.on_rent_quantity - returnedQty);
+            
+            const { error } = await supabase
+              .from('stock')
+              .update({
+                available_quantity: newAvailableQuantity,
+                on_rent_quantity: newOnRentQuantity,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', stockItem.id);
+
+            if (error) throw error;
+          }
+        }
+      }
+      
+      // Refresh stock data
       await fetchStockData();
     } catch (error) {
       console.error('Error updating stock:', error);
@@ -423,30 +449,39 @@ export function MobileReturnRental() {
         return;
       }
 
-      // Prepare plate data for service
-      const plateData: Record<string, { quantity: number; borrowedStock: number; notes: string }> = {};
-      PLATE_SIZES.forEach(size => {
-        plateData[size] = {
-          quantity: quantities[size] || 0,
-          borrowedStock: borrowedStockReturns[size] || 0,
-          notes: notes[size] || ''
-        };
-      });
+      // Create return record
+      const { data: returnRecord, error: returnError } = await supabase
+        .from("returns")
+        .insert([{
+          return_challan_number: returnChallanNumber,
+          client_id: selectedClient!.id,
+          return_date: returnDate,
+          driver_name: driverName || null
+        }])
+        .select()
+        .single();
 
-      // Use the service to create return challan
-      const result = await ChallanService.createChallan(
-        'jama',
-        returnChallanNumber,
-        returnDate,
-        selectedClient!.id,
-        driverName,
-        plateData
-      );
+      if (returnError) throw returnError;
 
-      if (!result.success) {
-        alert(`જમા ચલણ બનાવવામાં ભૂલ: ${result.error}`);
-        return;
-      }
+      // Create return line items with borrowed stock tracking
+      const lineItems = validItems.map(size => ({
+        return_id: returnRecord.id,
+        plate_size: size,
+        returned_quantity: quantities[size] || 0,
+        damaged_quantity: damagedQuantities[size] || 0,
+        lost_quantity: lostQuantities[size] || 0,
+        returned_borrowed_stock: borrowedStockReturns[size] || 0,
+        damage_notes: notes[size]?.trim() || null
+      }));
+
+      const { error: lineItemsError } = await supabase
+        .from("return_line_items")
+        .insert(lineItems);
+
+      if (lineItemsError) throw lineItemsError;
+
+      // Update stock quantities
+      await updateStockAfterReturn();
 
       // Calculate totals
       const regularTotal = validItems.reduce((sum, size) => sum + (quantities[size] || 0), 0);
@@ -459,7 +494,7 @@ export function MobileReturnRental() {
       // Prepare challan data for PDF
       const newChallanData: ChallanData = {
         type: "return",
-        challan_number: returnChallanNumber,
+        challan_number: returnRecord.return_challan_number,
         date: returnDate,
         client: {
           id: selectedClient!.id,
@@ -487,7 +522,7 @@ export function MobileReturnRental() {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       const jpgDataUrl = await generateJPGChallan(newChallanData);
-      downloadJPGChallan(jpgDataUrl, `return-challan-${returnChallanNumber}`);
+      downloadJPGChallan(jpgDataUrl, `return-challan-${returnRecord.return_challan_number}`);
 
       // Reset form
       setQuantities({});
@@ -552,8 +587,6 @@ export function MobileReturnRental() {
         }, 300);
       }, 3000);
 
-      // Refresh stock data after successful creation
-      await fetchStockData();
     } catch (error) {
       console.error("Error creating return challan:", error);
       

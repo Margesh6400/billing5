@@ -6,7 +6,6 @@ import { PrintableChallan } from './challans/PrintableChallan'
 import { generateJPGChallan, downloadJPGChallan } from '../utils/jpgChallanGenerator'
 import { ChallanData } from './challans/types'
 import { useAuth } from '../hooks/useAuth'
-import { ChallanService } from '../services/challanService'
 
 type Client = Database['public']['Tables']['clients']['Row']
 
@@ -139,35 +138,37 @@ export function ReturnPage() {
           damage_notes: overallNote.trim() || null,
         }))
 
-      // Prepare plate data for service
-      const plateData: Record<string, { quantity: number; borrowedStock: number; notes: string }> = {};
-      PLATE_SIZES.forEach(size => {
-        plateData[size] = {
-          quantity: quantities[size] || 0,
-          borrowedStock: 0, // No borrowed stock in desktop version
-          notes: overallNote || ''
-        };
-      });
+      // Create the return record (even if no line items)
+      const { data: returnRecord, error: returnError } = await supabase
+        .from('returns')
+        .insert([{
+          return_challan_number: returnChallanNumber,
+          client_id: selectedClient.id,
+          return_date: returnDate
+        }])
+        .select()
+        .single()
 
-      // Use the service to create return challan
-      const result = await ChallanService.createChallan(
-        'jama',
-        returnChallanNumber,
-        returnDate,
-        selectedClient.id,
-        '', // No driver name in desktop version
-        plateData
-      );
+      if (returnError) throw returnError
 
-      if (!result.success) {
-        alert(`Error creating return: ${result.error}`);
-        return;
+      // Create line items only for quantities > 0
+      if (returnEntries.length > 0) {
+        const lineItems = returnEntries.map(entry => ({
+          return_id: returnRecord.id,
+          ...entry
+        }))
+
+        const { error: lineItemsError } = await supabase
+          .from('return_line_items')
+          .insert(lineItems)
+
+        if (lineItemsError) throw lineItemsError
       }
 
       // Prepare challan data
       const newChallanData: ChallanData = {
         type: 'return',
-        challan_number: returnChallanNumber,
+        challan_number: returnRecord.return_challan_number,
         date: returnDate,
         client: {
           id: selectedClient.id,
@@ -208,8 +209,8 @@ export function ReturnPage() {
       setChallanData(null)
       
       const message = returnEntries.length > 0 
-        ? `Return challan ${returnChallanNumber} created and downloaded successfully with ${returnEntries.length} items!`
-        : `Return challan ${returnChallanNumber} created and downloaded successfully (no items returned).`
+        ? `Return challan ${returnRecord.return_challan_number} created and downloaded successfully with ${returnEntries.length} items!`
+        : `Return challan ${returnRecord.return_challan_number} created and downloaded successfully (no items returned).`
       
       alert(message)
     } catch (error) {

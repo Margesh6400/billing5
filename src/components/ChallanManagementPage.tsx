@@ -32,6 +32,70 @@ import { ChallanData } from './challans/types';
 import { useAuth } from '../hooks/useAuth';
 import { useChallanManagement, ChallanTransaction } from '../hooks/useChallanManagement';
 
+// Stock management utilities for main godown stock only
+interface StockUpdate {
+  plate_size: string;
+  quantity_change: number; // positive = increase stock, negative = decrease stock
+}
+
+// Calculate stock updates for main godown stock only (excludes borrowed stock)
+const calculateMainStockUpdates = (
+  items: Array<{ plate_size: string; quantity: number; borrowed_stock?: number }>,
+  type: 'udhar' | 'jama'
+): StockUpdate[] => {
+  const updates: StockUpdate[] = [];
+  
+  items.forEach(item => {
+    const regularQuantity = item.quantity || 0;
+    // Only count regular stock, not borrowed stock for main stock updates
+    if (regularQuantity > 0) {
+      updates.push({
+        plate_size: item.plate_size,
+        quantity_change: type === 'udhar' ? -regularQuantity : regularQuantity
+      });
+    }
+  });
+  
+  return updates;
+};
+
+// Apply stock updates to main godown stock only
+const applyMainStockUpdates = async (updates: StockUpdate[]): Promise<void> => {
+  for (const update of updates) {
+    const { data: stockItem, error: fetchError } = await supabase
+      .from('stock')
+      .select('*')
+      .eq('plate_size', update.plate_size)
+      .single();
+
+    if (fetchError) {
+      console.error(`Error fetching stock for ${update.plate_size}:`, fetchError);
+      continue;
+    }
+
+    const newAvailableQuantity = stockItem.available_quantity + update.quantity_change;
+    const newOnRentQuantity = stockItem.on_rent_quantity - update.quantity_change;
+
+    // Prevent negative stock
+    if (newAvailableQuantity < 0) {
+      throw new Error(`Insufficient stock for ${update.plate_size}. Available: ${stockItem.available_quantity}, Required: ${Math.abs(update.quantity_change)}`);
+    }
+
+    const { error: updateError } = await supabase
+      .from('stock')
+      .update({
+        available_quantity: Math.max(0, newAvailableQuantity),
+        on_rent_quantity: Math.max(0, newOnRentQuantity),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', stockItem.id);
+
+    if (updateError) {
+      throw new Error(`Error updating stock for ${update.plate_size}: ${updateError.message}`);
+    }
+  }
+};
+
 const PLATE_SIZES = [
   '2 X 3', '21 X 3', '18 X 3', '15 X 3', '12 X 3',
   '9 X 3', 'પતરા', '2 X 2', '2 ફુટ'
@@ -308,6 +372,43 @@ export function ChallanManagementPage() {
     if (!editModal.transaction) return;
 
     try {
+      // Get original transaction data to revert stock changes
+      let originalItems: Array<{ plate_size: string; quantity: number; borrowed_stock?: number }> = [];
+      
+      if (editModal.transaction.type === 'udhar') {
+        const { data: originalChallan, error } = await supabase
+          .from('challans')
+          .select('*, challan_items (*)')
+          .eq('id', editModal.transaction.id)
+          .single();
+        
+        if (error) throw error;
+        
+        originalItems = originalChallan.challan_items.map((item: any) => ({
+          plate_size: item.plate_size,
+          quantity: item.borrowed_quantity,
+          borrowed_stock: item.borrowed_stock || 0
+        }));
+      } else {
+        const { data: originalReturn, error } = await supabase
+          .from('returns')
+          .select('*, return_line_items (*)')
+          .eq('id', editModal.transaction.id)
+          .single();
+        
+        if (error) throw error;
+        
+        originalItems = originalReturn.return_line_items.map((item: any) => ({
+          plate_size: item.plate_size,
+          quantity: item.returned_quantity,
+          borrowed_stock: item.returned_borrowed_stock || 0
+        }));
+      }
+
+      // Step 1: Revert original stock changes (main stock only)
+      const revertUpdates = calculateMainStockUpdates(originalItems, editModal.transaction.type === 'udhar' ? 'jama' : 'udhar');
+      await applyMainStockUpdates(revertUpdates);
+
       const itemsArray = Object.entries(editModal.formData.items)
         .filter(([_, data]) => data.quantity > 0 || data.borrowed_stock > 0)
         .map(([size, data]) => ({
@@ -327,16 +428,84 @@ export function ChallanManagementPage() {
         return;
       }
 
-      await editTransaction(
-        editModal.transaction.id,
-        editModal.transaction.type,
-        {
-          number: editModal.formData.number,
-          date: editModal.formData.date,
-          driver_name: editModal.formData.driver_name,
-          items: itemsArray
-        }
-      );
+      // Step 2: Apply new stock changes (main stock only)
+      const newUpdates = calculateMainStockUpdates(itemsArray, editModal.transaction.type);
+      await applyMainStockUpdates(newUpdates);
+
+      // Step 3: Update the transaction in database
+      if (editModal.transaction.type === 'udhar') {
+        // Update challan
+        const { error: challanError } = await supabase
+          .from('challans')
+          .update({
+            challan_number: editModal.formData.number,
+            challan_date: editModal.formData.date,
+            driver_name: editModal.formData.driver_name || null
+          })
+          .eq('id', editModal.transaction.id);
+
+        if (challanError) throw challanError;
+
+        // Delete old items
+        const { error: deleteError } = await supabase
+          .from('challan_items')
+          .delete()
+          .eq('challan_id', editModal.transaction.id);
+
+        if (deleteError) throw deleteError;
+
+        // Insert new items
+        const newItems = itemsArray.map(item => ({
+          challan_id: editModal.transaction.id,
+          plate_size: item.plate_size,
+          borrowed_quantity: item.quantity,
+          borrowed_stock: item.borrowed_stock || 0,
+          partner_stock_notes: item.notes || null
+        }));
+
+        const { error: insertError } = await supabase
+          .from('challan_items')
+          .insert(newItems);
+
+        if (insertError) throw insertError;
+      } else {
+        // Update return
+        const { error: returnError } = await supabase
+          .from('returns')
+          .update({
+            return_challan_number: editModal.formData.number,
+            return_date: editModal.formData.date,
+            driver_name: editModal.formData.driver_name || null
+          })
+          .eq('id', editModal.transaction.id);
+
+        if (returnError) throw returnError;
+
+        // Delete old items
+        const { error: deleteError } = await supabase
+          .from('return_line_items')
+          .delete()
+          .eq('return_id', editModal.transaction.id);
+
+        if (deleteError) throw deleteError;
+
+        // Insert new items
+        const newItems = itemsArray.map(item => ({
+          return_id: editModal.transaction.id,
+          plate_size: item.plate_size,
+          returned_quantity: item.quantity,
+          returned_borrowed_stock: item.borrowed_stock || 0,
+          damage_notes: item.notes || null,
+          damaged_quantity: 0,
+          lost_quantity: 0
+        }));
+
+        const { error: insertError } = await supabase
+          .from('return_line_items')
+          .insert(newItems);
+
+        if (insertError) throw insertError;
+      }
 
       closeEditModal();
       await fetchAllTransactions();
@@ -358,7 +527,78 @@ export function ChallanManagementPage() {
     if (!confirmDelete) return;
 
     try {
-      await deleteTransaction(editModal.transaction.id, editModal.transaction.type);
+      // Step 1: Get transaction data to revert stock changes
+      let itemsToRevert: Array<{ plate_size: string; quantity: number; borrowed_stock?: number }> = [];
+      
+      if (editModal.transaction.type === 'udhar') {
+        const { data: challan, error } = await supabase
+          .from('challans')
+          .select('*, challan_items (*)')
+          .eq('id', editModal.transaction.id)
+          .single();
+        
+        if (error) throw error;
+        
+        itemsToRevert = challan.challan_items.map((item: any) => ({
+          plate_size: item.plate_size,
+          quantity: item.borrowed_quantity,
+          borrowed_stock: item.borrowed_stock || 0
+        }));
+      } else {
+        const { data: returnRecord, error } = await supabase
+          .from('returns')
+          .select('*, return_line_items (*)')
+          .eq('id', editModal.transaction.id)
+          .single();
+        
+        if (error) throw error;
+        
+        itemsToRevert = returnRecord.return_line_items.map((item: any) => ({
+          plate_size: item.plate_size,
+          quantity: item.returned_quantity,
+          borrowed_stock: item.returned_borrowed_stock || 0
+        }));
+      }
+
+      // Step 2: Revert stock changes (main stock only)
+      const revertUpdates = calculateMainStockUpdates(itemsToRevert, editModal.transaction.type === 'udhar' ? 'jama' : 'udhar');
+      await applyMainStockUpdates(revertUpdates);
+
+      // Step 3: Delete the transaction
+      if (editModal.transaction.type === 'udhar') {
+        // Delete challan items first (foreign key constraint)
+        const { error: itemsError } = await supabase
+          .from('challan_items')
+          .delete()
+          .eq('challan_id', editModal.transaction.id);
+
+        if (itemsError) throw itemsError;
+
+        // Delete challan
+        const { error: challanError } = await supabase
+          .from('challans')
+          .delete()
+          .eq('id', editModal.transaction.id);
+
+        if (challanError) throw challanError;
+      } else {
+        // Delete return items first (foreign key constraint)
+        const { error: itemsError } = await supabase
+          .from('return_line_items')
+          .delete()
+          .eq('return_id', editModal.transaction.id);
+
+        if (itemsError) throw itemsError;
+
+        // Delete return
+        const { error: returnError } = await supabase
+          .from('returns')
+          .delete()
+          .eq('id', editModal.transaction.id);
+
+        if (returnError) throw returnError;
+      }
+
       closeEditModal();
       await fetchAllTransactions();
       await fetchStockData();

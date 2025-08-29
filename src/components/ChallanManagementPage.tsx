@@ -477,26 +477,32 @@ export function ChallanManagementPage() {
           .eq('challan_id', id);
         if (oldErr) throw oldErr;
 
-        // Use only own borrowed_quantity for stock deltas (ignore borrowed_stock here)
+        // Calculate old totals (only own borrowed_quantity for stock calculations)
         const oldTotals: Record<string, number> = {};
         (oldItems || []).forEach((it: any) => {
           oldTotals[it.plate_size] = (oldTotals[it.plate_size] || 0) + (it.borrowed_quantity || 0);
         });
 
+        // Calculate new totals (only own quantity for stock calculations)
         const newTotals: Record<string, number> = {};
         Object.entries(editState.plateData).forEach(([plate, v]) => {
           const qty = (v.quantity || 0); // only own quantity
           if (qty > 0) newTotals[plate] = qty;
         });
 
+        // Calculate deltas (old - new) as per the requirement
         const plates = Array.from(new Set([...Object.keys(oldTotals), ...Object.keys(newTotals)]));
         const deltas: Record<string, number> = {};
         plates.forEach(p => {
-          const d = (newTotals[p] || 0) - (oldTotals[p] || 0); // positive => more issued => reduce available
-          if (d !== 0) deltas[p] = d;
+          const delta = (oldTotals[p] || 0) - (newTotals[p] || 0); // old - new
+          if (delta !== 0) deltas[p] = delta;
         });
 
-  if (Object.keys(deltas).length > 0) {
+        // If none of the own-quantities changed (old == new for all plates), skip updating main stock
+        const hasOwnQuantityChange = plates.some(p => (oldTotals[p] || 0) !== (newTotals[p] || 0));
+        if (!hasOwnQuantityChange) {
+          console.debug('[Challan Edit][UDHAR] no own-quantity change detected, skipping main stock updates', { oldTotals, newTotals });
+        } else {
           const { data: stocks, error: stockErr } = await supabase
             .from('stock')
             .select('id, plate_size, available_quantity')
@@ -508,7 +514,17 @@ export function ChallanManagementPage() {
             for (const s of (stocks || [])) {
               const delta = deltas[s.plate_size] || 0;
               if (delta === 0) continue;
-              const newAvailable = Math.max(0, (s.available_quantity || 0) - delta);
+
+              const beforeAvailable = s.available_quantity || 0;
+              // If delta > 0: old > new, so add back to stock (delta amount was reduced, now return it)
+              // If delta < 0: old < new, so reduce from stock (more is being issued)
+              const newAvailable = delta > 0
+                ? beforeAvailable + delta // add back to stock
+                : Math.max(0, beforeAvailable + delta); // reduce from stock (delta is negative)
+
+              // debug log to trace incorrect stock adjustments
+              console.debug('[Challan Edit][UDHAR] plate=%s id=%s delta=%d beforeAvailable=%d newAvailable=%d oldTotals=%o newTotals=%o', s.plate_size, s.id, delta, beforeAvailable, newAvailable, oldTotals, newTotals);
+
               const { error: updErr } = await supabase
                 .from('stock')
                 .update({ available_quantity: newAvailable })
@@ -517,9 +533,13 @@ export function ChallanManagementPage() {
               applied.push({ id: s.id, previous: s.available_quantity || 0 });
             }
           } catch (uErr) {
-            // revert
+            // Revert on error
             for (const a of applied) {
-              try { await supabase.from('stock').update({ available_quantity: a.previous }).eq('id', a.id); } catch (e) { console.error('revert failed', e); }
+              try {
+                await supabase.from('stock').update({ available_quantity: a.previous }).eq('id', a.id);
+              } catch (e) {
+                console.error('revert failed', e);
+              }
             }
             throw uErr;
           }
@@ -560,7 +580,7 @@ export function ChallanManagementPage() {
           if (insertError) throw insertError;
         }
       } else {
-        // jama (returns)
+        // jama (returns) logic remains the same
         const { data: oldItems, error: oldErr } = await supabase
           .from('return_line_items')
           .select('plate_size, returned_quantity, returned_borrowed_stock')
@@ -586,7 +606,11 @@ export function ChallanManagementPage() {
           if (d !== 0) deltas[p] = d;
         });
 
-        if (Object.keys(deltas).length > 0) {
+        // For returns, if returned own quantities didn't change, skip main stock updates
+        const hasOwnReturnChange = plates.some(p => (newTotals[p] || 0) !== (oldTotals[p] || 0));
+        if (!hasOwnReturnChange) {
+          console.debug('[Challan Edit][JAMA] no own-return change detected, skipping main stock updates', { oldTotals, newTotals });
+        } else {
           const { data: stocks, error: stockErr } = await supabase
             .from('stock')
             .select('id, plate_size, available_quantity')
@@ -598,7 +622,9 @@ export function ChallanManagementPage() {
             for (const s of (stocks || [])) {
               const delta = deltas[s.plate_size] || 0;
               if (delta === 0) continue;
-              const newAvailable = Math.max(0, (s.available_quantity || 0) + delta);
+              const beforeAvailable = s.available_quantity || 0;
+              const newAvailable = Math.max(0, beforeAvailable + delta);
+              console.debug('[Challan Edit][JAMA] plate=%s id=%s delta=%d beforeAvailable=%d newAvailable=%d', s.plate_size, s.id, delta, beforeAvailable, newAvailable);
               const { error: updErr } = await supabase
                 .from('stock')
                 .update({ available_quantity: newAvailable })
@@ -684,7 +710,11 @@ export function ChallanManagementPage() {
           if (qty > 0) deltas[it.plate_size] = (deltas[it.plate_size] || 0) + qty;
         });
 
-        if (Object.keys(deltas).length > 0) {
+        // Only restore own borrowed quantities to stock; if none exist, skip
+        const hasOwnRestore = Object.keys(deltas).some(p => (deltas[p] || 0) !== 0);
+        if (!hasOwnRestore) {
+          console.debug('[Challan Delete][UDHAR] no own borrowed quantities to restore, skipping main stock updates', { deltas });
+        } else {
           const { data: stocks, error: stockErr } = await supabase
             .from('stock')
             .select('id, plate_size, available_quantity')
@@ -696,11 +726,13 @@ export function ChallanManagementPage() {
             for (const s of (stocks || [])) {
               const delta = deltas[s.plate_size] || 0;
               if (delta === 0) continue;
-              const newAvailable = (s.available_quantity || 0) + delta;
-              const { error: updErr } = await supabase
-                .from('stock')
-                .update({ available_quantity: newAvailable })
-                .eq('id', s.id);
+                const beforeAvailable = s.available_quantity || 0;
+                const newAvailable = beforeAvailable + delta;
+                console.debug('[Challan Delete][UDHAR] plate=%s id=%s delta=%d beforeAvailable=%d newAvailable=%d', s.plate_size, s.id, delta, beforeAvailable, newAvailable);
+                const { error: updErr } = await supabase
+                  .from('stock')
+                  .update({ available_quantity: newAvailable })
+                  .eq('id', s.id);
               if (updErr) throw updErr;
               applied.push({ id: s.id, previous: s.available_quantity || 0 });
             }
@@ -738,7 +770,11 @@ export function ChallanManagementPage() {
           if (qty > 0) deltas[it.plate_size] = (deltas[it.plate_size] || 0) + qty;
         });
 
-        if (Object.keys(deltas).length > 0) {
+        // For jama delete, if no returned own quantities present, skip main stock subtraction
+        const hasOwnJamaDelete = Object.keys(deltas).some(p => (deltas[p] || 0) !== 0);
+        if (!hasOwnJamaDelete) {
+          console.debug('[Challan Delete][JAMA] no own returned quantities to subtract, skipping main stock updates', { deltas });
+        } else {
           const { data: stocks, error: stockErr } = await supabase
             .from('stock')
             .select('id, plate_size, available_quantity')
@@ -750,7 +786,9 @@ export function ChallanManagementPage() {
             for (const s of (stocks || [])) {
               const delta = deltas[s.plate_size] || 0;
               if (delta === 0) continue;
-              const newAvailable = Math.max(0, (s.available_quantity || 0) - delta);
+              const beforeAvailable = s.available_quantity || 0;
+              const newAvailable = Math.max(0, beforeAvailable - delta);
+              console.debug('[Challan Delete][JAMA] plate=%s id=%s delta=%d beforeAvailable=%d newAvailable=%d', s.plate_size, s.id, delta, beforeAvailable, newAvailable);
               const { error: updErr } = await supabase
                 .from('stock')
                 .update({ available_quantity: newAvailable })

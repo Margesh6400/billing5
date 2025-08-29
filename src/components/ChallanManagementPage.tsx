@@ -5,13 +5,9 @@ import {
   Download, 
   Eye, 
   Search, 
-  ChevronDown, 
-  ChevronUp, 
-  Calendar, 
   User, 
   Hash, 
   FileText, 
-  RotateCcw, 
   Edit, 
   Save, 
   X, 
@@ -20,7 +16,6 @@ import {
   Lock,
   ArrowLeft,
   Package,
-  Plus,
   MapPin,
   Phone,
   Loader2,
@@ -152,9 +147,17 @@ export function ChallanManagementPage() {
   const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
-    fetchClients();
-    fetchStockData();
-    fetchPreviousDriverNames();
+    console.log('Initial useEffect running');
+    const loadData = async () => {
+      console.log('Starting data fetch');
+      await Promise.all([
+        fetchClients(),
+        fetchStockData(),
+        fetchPreviousDriverNames()
+      ]);
+      console.log('Data fetch complete');
+    };
+    loadData();
   }, []);
 
   const fetchStockData = async () => {
@@ -265,12 +268,13 @@ export function ChallanManagementPage() {
         driver_name: returnRecord.driver_name
       })) || [];
 
+      // Totals for outstanding should consider own quantities only (borrowed/returned)
       const totalBorrowed = transformedUdharData.reduce((sum, challan) => 
         sum + challan.challan_items.reduce((itemSum, item) => 
-          itemSum + item.borrowed_quantity + (item.borrowed_stock || 0), 0), 0);
+          itemSum + (item.borrowed_quantity || 0), 0), 0);
       const totalReturned = transformedJamaData.reduce((sum, returnRecord) => 
         sum + returnRecord.return_line_items.reduce((itemSum, item) => 
-          itemSum + item.returned_quantity + (item.returned_borrowed_stock || 0), 0), 0);
+          itemSum + (item.returned_quantity || 0), 0), 0);
       const total_outstanding = totalBorrowed - totalReturned;
 
       const allTransactions = [
@@ -462,13 +466,191 @@ export function ChallanManagementPage() {
 
     setEditLoading(true);
     try {
-      // Your existing save logic here - keep it the same
-      // Just use editState instead of editingChallan
-      
-      closeEditModal();
-      if (selectedClient) {
-        await fetchClientLedger(selectedClient);
+      const id = editState.transactionId;
+
+      // Compute deltas and update stock accordingly
+      if (editState.transactionType === 'udhar') {
+        // fetch old challan items
+        const { data: oldItems, error: oldErr } = await supabase
+          .from('challan_items')
+          .select('plate_size, borrowed_quantity, borrowed_stock')
+          .eq('challan_id', id);
+        if (oldErr) throw oldErr;
+
+        // Use only own borrowed_quantity for stock deltas (ignore borrowed_stock here)
+        const oldTotals: Record<string, number> = {};
+        (oldItems || []).forEach((it: any) => {
+          oldTotals[it.plate_size] = (oldTotals[it.plate_size] || 0) + (it.borrowed_quantity || 0);
+        });
+
+        const newTotals: Record<string, number> = {};
+        Object.entries(editState.plateData).forEach(([plate, v]) => {
+          const qty = (v.quantity || 0); // only own quantity
+          if (qty > 0) newTotals[plate] = qty;
+        });
+
+        const plates = Array.from(new Set([...Object.keys(oldTotals), ...Object.keys(newTotals)]));
+        const deltas: Record<string, number> = {};
+        plates.forEach(p => {
+          const d = (newTotals[p] || 0) - (oldTotals[p] || 0); // positive => more issued => reduce available
+          if (d !== 0) deltas[p] = d;
+        });
+
+  if (Object.keys(deltas).length > 0) {
+          const { data: stocks, error: stockErr } = await supabase
+            .from('stock')
+            .select('id, plate_size, available_quantity')
+            .in('plate_size', Object.keys(deltas));
+          if (stockErr) throw stockErr;
+
+          const applied: Array<{ id: number; previous: number }> = [];
+          try {
+            for (const s of (stocks || [])) {
+              const delta = deltas[s.plate_size] || 0;
+              if (delta === 0) continue;
+              const newAvailable = Math.max(0, (s.available_quantity || 0) - delta);
+              const { error: updErr } = await supabase
+                .from('stock')
+                .update({ available_quantity: newAvailable })
+                .eq('id', s.id);
+              if (updErr) throw updErr;
+              applied.push({ id: s.id, previous: s.available_quantity || 0 });
+            }
+          } catch (uErr) {
+            // revert
+            for (const a of applied) {
+              try { await supabase.from('stock').update({ available_quantity: a.previous }).eq('id', a.id); } catch (e) { console.error('revert failed', e); }
+            }
+            throw uErr;
+          }
+        }
+
+        // update header then replace items
+        const { error: challanError } = await supabase
+          .from('challans')
+          .update({
+            challan_number: editState.challanNumber,
+            challan_date: editState.date,
+            client_id: editState.clientId,
+            driver_name: editState.driverName || null
+          })
+          .eq('id', id);
+        if (challanError) throw challanError;
+
+        const { error: deleteError } = await supabase
+          .from('challan_items')
+          .delete()
+          .eq('challan_id', id);
+        if (deleteError) throw deleteError;
+
+        const newItems = Object.entries(editState.plateData)
+          .filter(([_, v]) => (v.quantity || 0) > 0 || (v.borrowedStock || 0) > 0)
+          .map(([plate_size, v]) => ({
+            challan_id: id,
+            plate_size,
+            borrowed_quantity: v.quantity || 0,
+            borrowed_stock: v.borrowedStock || 0,
+            partner_stock_notes: (v.notes || '').trim() || null
+          }));
+
+        if (newItems.length > 0) {
+          const { error: insertError } = await supabase
+            .from('challan_items')
+            .insert(newItems);
+          if (insertError) throw insertError;
+        }
+      } else {
+        // jama (returns)
+        const { data: oldItems, error: oldErr } = await supabase
+          .from('return_line_items')
+          .select('plate_size, returned_quantity, returned_borrowed_stock')
+          .eq('return_id', id);
+        if (oldErr) throw oldErr;
+
+        // For returns, compute deltas only based on returned_quantity (own stock)
+        const oldTotals: Record<string, number> = {};
+        (oldItems || []).forEach((it: any) => {
+          oldTotals[it.plate_size] = (oldTotals[it.plate_size] || 0) + (it.returned_quantity || 0);
+        });
+
+        const newTotals: Record<string, number> = {};
+        Object.entries(editState.plateData).forEach(([plate, v]) => {
+          const qty = (v.quantity || 0);
+          if (qty > 0) newTotals[plate] = qty;
+        });
+
+        const plates = Array.from(new Set([...Object.keys(oldTotals), ...Object.keys(newTotals)]));
+        const deltas: Record<string, number> = {};
+        plates.forEach(p => {
+          const d = (newTotals[p] || 0) - (oldTotals[p] || 0); // positive => more returned => increase available
+          if (d !== 0) deltas[p] = d;
+        });
+
+        if (Object.keys(deltas).length > 0) {
+          const { data: stocks, error: stockErr } = await supabase
+            .from('stock')
+            .select('id, plate_size, available_quantity')
+            .in('plate_size', Object.keys(deltas));
+          if (stockErr) throw stockErr;
+
+          const applied: Array<{ id: number; previous: number }> = [];
+          try {
+            for (const s of (stocks || [])) {
+              const delta = deltas[s.plate_size] || 0;
+              if (delta === 0) continue;
+              const newAvailable = Math.max(0, (s.available_quantity || 0) + delta);
+              const { error: updErr } = await supabase
+                .from('stock')
+                .update({ available_quantity: newAvailable })
+                .eq('id', s.id);
+              if (updErr) throw updErr;
+              applied.push({ id: s.id, previous: s.available_quantity || 0 });
+            }
+          } catch (uErr) {
+            for (const a of applied) {
+              try { await supabase.from('stock').update({ available_quantity: a.previous }).eq('id', a.id); } catch (e) { console.error('revert failed', e); }
+            }
+            throw uErr;
+          }
+        }
+
+        const { error: returnError } = await supabase
+          .from('returns')
+          .update({
+            return_challan_number: editState.challanNumber,
+            return_date: editState.date,
+            client_id: editState.clientId,
+            driver_name: editState.driverName || null
+          })
+          .eq('id', id);
+        if (returnError) throw returnError;
+
+        const { error: deleteError } = await supabase
+          .from('return_line_items')
+          .delete()
+          .eq('return_id', id);
+        if (deleteError) throw deleteError;
+
+        const newItems = Object.entries(editState.plateData)
+          .filter(([_, v]) => (v.quantity || 0) > 0 || (v.borrowedStock || 0) > 0)
+          .map(([plate_size, v]) => ({
+            return_id: id,
+            plate_size,
+            returned_quantity: v.quantity || 0,
+            returned_borrowed_stock: v.borrowedStock || 0,
+            damage_notes: (v.notes || '').trim() || null
+          }));
+
+        if (newItems.length > 0) {
+          const { error: insertError } = await supabase
+            .from('return_line_items')
+            .insert(newItems);
+          if (insertError) throw insertError;
+        }
       }
+
+      closeEditModal();
+      if (selectedClient) await fetchClientLedger(selectedClient);
       alert('ચલણ સફળતાપૂર્વક અપડેટ થયું!');
     } catch (error) {
       console.error('Error updating challan:', error);
@@ -486,12 +668,119 @@ export function ChallanManagementPage() {
 
     setEditLoading(true);
     try {
-      // Your existing delete logic here - keep it the same
-      
-      closeEditModal();
-      if (selectedClient) {
-        await fetchClientLedger(selectedClient);
+      const id = editState.transactionId;
+      if (editState.transactionType === 'udhar') {
+        // read items and restore to stock
+        const { data: items, error: itemsErr } = await supabase
+          .from('challan_items')
+          .select('plate_size, borrowed_quantity, borrowed_stock')
+          .eq('challan_id', id);
+        if (itemsErr) throw itemsErr;
+
+        // Only restore own borrowed quantities to stock (ignore borrowed_stock here)
+        const deltas: Record<string, number> = {};
+        (items || []).forEach((it: any) => {
+          const qty = (it.borrowed_quantity || 0);
+          if (qty > 0) deltas[it.plate_size] = (deltas[it.plate_size] || 0) + qty;
+        });
+
+        if (Object.keys(deltas).length > 0) {
+          const { data: stocks, error: stockErr } = await supabase
+            .from('stock')
+            .select('id, plate_size, available_quantity')
+            .in('plate_size', Object.keys(deltas));
+          if (stockErr) throw stockErr;
+
+          const applied: Array<{ id: number; previous: number }> = [];
+          try {
+            for (const s of (stocks || [])) {
+              const delta = deltas[s.plate_size] || 0;
+              if (delta === 0) continue;
+              const newAvailable = (s.available_quantity || 0) + delta;
+              const { error: updErr } = await supabase
+                .from('stock')
+                .update({ available_quantity: newAvailable })
+                .eq('id', s.id);
+              if (updErr) throw updErr;
+              applied.push({ id: s.id, previous: s.available_quantity || 0 });
+            }
+          } catch (uErr) {
+            for (const a of applied) {
+              try { await supabase.from('stock').update({ available_quantity: a.previous }).eq('id', a.id); } catch (e) { console.error('revert failed', e); }
+            }
+            throw uErr;
+          }
+        }
+
+        const { error: deleteItemsError } = await supabase
+          .from('challan_items')
+          .delete()
+          .eq('challan_id', id);
+        if (deleteItemsError) throw deleteItemsError;
+
+        const { error: deleteHeaderError } = await supabase
+          .from('challans')
+          .delete()
+          .eq('id', id);
+        if (deleteHeaderError) throw deleteHeaderError;
+      } else {
+        // jama: subtract returned amounts from stock
+        const { data: items, error: itemsErr } = await supabase
+          .from('return_line_items')
+          .select('plate_size, returned_quantity, returned_borrowed_stock')
+          .eq('return_id', id);
+        if (itemsErr) throw itemsErr;
+
+        // For jama delete, subtract only the returned_quantity from available stock (borrowed stock handled separately)
+        const deltas: Record<string, number> = {};
+        (items || []).forEach((it: any) => {
+          const qty = (it.returned_quantity || 0);
+          if (qty > 0) deltas[it.plate_size] = (deltas[it.plate_size] || 0) + qty;
+        });
+
+        if (Object.keys(deltas).length > 0) {
+          const { data: stocks, error: stockErr } = await supabase
+            .from('stock')
+            .select('id, plate_size, available_quantity')
+            .in('plate_size', Object.keys(deltas));
+          if (stockErr) throw stockErr;
+
+          const applied: Array<{ id: number; previous: number }> = [];
+          try {
+            for (const s of (stocks || [])) {
+              const delta = deltas[s.plate_size] || 0;
+              if (delta === 0) continue;
+              const newAvailable = Math.max(0, (s.available_quantity || 0) - delta);
+              const { error: updErr } = await supabase
+                .from('stock')
+                .update({ available_quantity: newAvailable })
+                .eq('id', s.id);
+              if (updErr) throw updErr;
+              applied.push({ id: s.id, previous: s.available_quantity || 0 });
+            }
+          } catch (uErr) {
+            for (const a of applied) {
+              try { await supabase.from('stock').update({ available_quantity: a.previous }).eq('id', a.id); } catch (e) { console.error('revert failed', e); }
+            }
+            throw uErr;
+          }
+        }
+
+        const { error: deleteItemsError } = await supabase
+          .from('return_line_items')
+          .delete()
+          .eq('return_id', id);
+        if (deleteItemsError) throw deleteItemsError;
+
+        const { error: deleteHeaderError } = await supabase
+          .from('returns')
+          .delete()
+          .eq('id', id);
+        if (deleteHeaderError) throw deleteHeaderError;
       }
+
+      closeEditModal();
+      if (selectedClient) await fetchClientLedger(selectedClient);
       alert('ચલણ સફળતાપૂર્વક ડિલીટ થયું!');
     } catch (error) {
       console.error('Error deleting challan:', error);
@@ -724,7 +1013,7 @@ export function ChallanManagementPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {clientLedger?.all_transactions.map((transaction, index) => (
+                      {clientLedger?.all_transactions.map((transaction) => (
                         <tr 
                           key={`${transaction.type}-${transaction.id}`}
                           className={`border-b border-blue-100 hover:bg-blue-25 transition-colors ${

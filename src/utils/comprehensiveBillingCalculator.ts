@@ -248,8 +248,8 @@ export class ComprehensiveBillingCalculator {
       client,
       bill_number: '', // Will be set by caller
       bill_date: billDate,
-      ledger_entries,
-      date_ranges,
+      ledger_entries: ledgerEntries,
+      date_ranges: dateRanges,
       total_rent: totalRent,
       total_plates_issued: totalPlatesIssued,
       service_charge: serviceCharge,

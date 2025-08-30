@@ -317,31 +317,6 @@ export function ComprehensiveBillManagement() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block mb-1 text-xs font-medium text-gray-700">
-                    શરૂઆતની તારીખ (વૈકલ્પિક)
-                  </label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block mb-1 text-xs font-medium text-gray-700">
-                    અંતિમ તારીખ (વૈકલ્પિક)
-                  </label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
               <div>
                 <label className="block mb-1 text-xs font-medium text-gray-700">
                   અગાઉથી ચૂકવેલ રકમ (₹)
@@ -461,28 +436,6 @@ export function ComprehensiveBillManagement() {
             </div>
             
             <div className="p-3 space-y-3">
-              {/* Summary Stats */}
-              <div className="grid grid-cols-4 gap-2">
-                <div className="p-2 text-center border border-blue-200 rounded bg-blue-50">
-                  <div className="text-lg font-bold text-blue-700">{billData.total_plates_issued}</div>
-                  <div className="text-xs text-blue-600">કુલ ઇશ્યૂ</div>
-                </div>
-                <div className="p-2 text-center border border-green-200 rounded bg-green-50">
-                  <div className="text-lg font-bold text-green-700">{billData.date_ranges.length}</div>
-                  <div className="text-xs text-green-600">બિલિંગ પીરિયડ</div>
-                </div>
-                <div className="p-2 text-center border border-yellow-200 rounded bg-yellow-50">
-                  <div className="text-lg font-bold text-yellow-700">{billData.lost_plates_count}</div>
-                  <div className="text-xs text-yellow-600">ગુમ પ્લેટ</div>
-                </div>
-                <div className="p-2 text-center border border-purple-200 rounded bg-purple-50">
-                  <div className="text-lg font-bold text-purple-700">
-                    ₹{billData.final_due.toFixed(2)}
-                  </div>
-                  <div className="text-xs text-purple-600">અંતિમ બાકી</div>
-                </div>
-              </div>
-
               {/* Date Range Breakdown */}
               <div className="overflow-x-auto">
                 <table className="w-full text-xs border border-gray-200 rounded">

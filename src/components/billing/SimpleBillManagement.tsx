@@ -218,7 +218,7 @@ export function SimpleBillManagement() {
           <div className="inline-flex items-center justify-center w-10 h-10 mb-2 rounded-full shadow-lg bg-gradient-to-r from-blue-600 to-indigo-600">
             <Calculator className="w-5 h-5 text-white" />
           </div>
-          <h1 className="mb-1 text-base font-bold text-gray-900">સિમ્પલ બિલિંગ</h1>
+          <h1 className="mb-1 text-base font-bold text-gray-900">બિલિંગ</h1>
           <p className="text-xs text-blue-600">તારીખ આધારિત ભાડા ગણતરી</p>
         </div>
 
@@ -245,7 +245,7 @@ export function SimpleBillManagement() {
                   />
                 </div>
 
-                <div className="space-y-2 max-h-60 overflow-y-auto">
+                <div className="space-y-2 overflow-y-auto max-h-60">
                   {filteredClients.map((client) => (
                     <button
                       key={client.id}
@@ -329,31 +329,6 @@ export function SimpleBillManagement() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block mb-1 text-xs font-medium text-gray-700">
-                    શરૂઆતની તારીખ (વૈકલ્પિક)
-                  </label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block mb-1 text-xs font-medium text-gray-700">
-                    અંતિમ તારીખ (વૈકલ્પિક)
-                  </label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
               <div>
                 <label className="block mb-1 text-xs font-medium text-gray-700">
                   દર પ્રતિ પ્લેટ પ્રતિ દિવસ (₹)
@@ -430,14 +405,14 @@ export function SimpleBillManagement() {
                     />
                     <button
                       onClick={() => removeExtraCharge(index)}
-                      className="p-1 text-red-600 hover:bg-red-50 rounded"
+                      className="p-1 text-red-600 rounded hover:bg-red-50"
                     >
                       <Minus className="w-3 h-3" />
                     </button>
                   </div>
                 ))}
                 {extraCharges.length === 0 && (
-                  <p className="text-xs text-gray-500 text-center py-2">કોઈ વધારાના ચાર્જ નથી</p>
+                  <p className="py-2 text-xs text-center text-gray-500">કોઈ વધારાના ચાર્જ નથી</p>
                 )}
               </div>
             </div>
@@ -479,14 +454,14 @@ export function SimpleBillManagement() {
                     />
                     <button
                       onClick={() => removeDiscount(index)}
-                      className="p-1 text-red-600 hover:bg-red-50 rounded"
+                      className="p-1 text-red-600 rounded hover:bg-red-50"
                     >
                       <Minus className="w-3 h-3" />
                     </button>
                   </div>
                 ))}
                 {discounts.length === 0 && (
-                  <p className="text-xs text-gray-500 text-center py-2">કોઈ ડિસ્કાઉન્ટ નથી</p>
+                  <p className="py-2 text-xs text-center text-gray-500">કોઈ ડિસ્કાઉન્ટ નથી</p>
                 )}
               </div>
             </div>
@@ -506,17 +481,17 @@ export function SimpleBillManagement() {
             <div className="p-3 space-y-3">
               {/* Summary Stats */}
               <div className="grid grid-cols-3 gap-2">
-                <div className="p-2 text-center bg-blue-50 border border-blue-200 rounded">
+                <div className="p-2 text-center border border-blue-200 rounded bg-blue-50">
                   <div className="text-lg font-bold text-blue-700">{billData.total_days}</div>
                   <div className="text-xs text-blue-600">કુલ દિવસ</div>
                 </div>
-                <div className="p-2 text-center bg-green-50 border border-green-200 rounded">
+                <div className="p-2 text-center border border-green-200 rounded bg-green-50">
                   <div className="text-lg font-bold text-green-700">
                     {Math.round(billData.total_plates / (billData.daily_balances.filter(d => d.days_count > 0).length || 1))}
                   </div>
                   <div className="text-xs text-green-600">સરેરાશ પ્લેટ</div>
                 </div>
-                <div className="p-2 text-center bg-purple-50 border border-purple-200 rounded">
+                <div className="p-2 text-center border border-purple-200 rounded bg-purple-50">
                   <div className="text-lg font-bold text-purple-700">
                     ₹{billData.grand_total.toFixed(2)}
                   </div>
@@ -541,15 +516,15 @@ export function SimpleBillManagement() {
                         <td className="px-2 py-1 font-medium">
                           {new Date(day.date).toLocaleDateString('en-GB')}
                         </td>
-                        <td className="px-2 py-1 text-center font-bold text-blue-600">
+                        <td className="px-2 py-1 font-bold text-center text-blue-600">
                           {day.plate_balance}
                         </td>
-                        <td className="px-2 py-1 text-center font-bold">
+                        <td className="px-2 py-1 font-bold text-center">
                           <span className={day.days_count === 0 ? 'text-gray-500' : 'text-green-600'}>
                             {day.days_count}
                           </span>
                         </td>
-                        <td className="px-2 py-1 text-center font-bold">
+                        <td className="px-2 py-1 font-bold text-center">
                           <span className={day.amount === 0 ? 'text-gray-500' : 'text-purple-600'}>
                             ₹{day.amount.toFixed(2)}
                           </span>
@@ -581,31 +556,6 @@ export function SimpleBillManagement() {
             </div>
           </div>
         )}
-
-        {/* Instructions */}
-        <div className="overflow-hidden bg-white border-2 border-gray-100 shadow-lg rounded-xl">
-          <div className="p-3 bg-gradient-to-r from-gray-500 to-gray-600">
-            <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-              <FileText className="w-4 h-4" />
-              બિલિંગ નિયમો
-            </h3>
-          </div>
-          
-          <div className="p-3 space-y-2 text-xs text-gray-600">
-            <div className="flex items-start gap-2">
-              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-1.5"></div>
-              <p>દરેક નવી તારીખ = 1 પૂરો દિવસ ભાડો</p>
-            </div>
-            <div className="flex items-start gap-2">
-              <div className="w-1.5 h-1.5 bg-green-500 rounded-full mt-1.5"></div>
-              <p>પહેલી તારીખ ફ્રી (કોઈ ચાર્જ નહીં)</p>
-            </div>
-            <div className="flex items-start gap-2">
-              <div className="w-1.5 h-1.5 bg-purple-500 rounded-full mt-1.5"></div>
-              <p>ભાડો = પ્લેટ બેલેન્સ × દિવસ × દર</p>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

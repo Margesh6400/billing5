@@ -7,8 +7,6 @@ import {
   Download, 
   Search, 
   User, 
-  Calendar, 
-  DollarSign,
   Plus,
   Minus,
   FileText,
@@ -203,8 +201,7 @@ export function AdvancedBillManagement() {
           <div className="inline-flex items-center justify-center w-10 h-10 mb-2 rounded-full shadow-lg bg-gradient-to-r from-blue-600 to-indigo-600">
             <Calculator className="w-5 h-5 text-white" />
           </div>
-          <h1 className="mb-1 text-base font-bold text-gray-900">એડવાન્સ બિલિંગ</h1>
-          <p className="text-xs text-blue-600">તારીખ શ્રેણી આધારિત ભાડા ગણતરી</p>
+          <h1 className="mb-1 text-base font-bold text-gray-900">બિલિંગ</h1>
         </div>
 
         {/* Client Selection */}
@@ -230,7 +227,7 @@ export function AdvancedBillManagement() {
                   />
                 </div>
 
-                <div className="space-y-2 max-h-60 overflow-y-auto">
+                <div className="space-y-2 overflow-y-auto max-h-60">
                   {filteredClients.map((client) => (
                     <button
                       key={client.id}
@@ -317,17 +314,6 @@ export function AdvancedBillManagement() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block mb-1 text-xs font-medium text-gray-700">
-                    શરૂઆતની તારીખ (વૈકલ્પિક)
-                  </label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block mb-1 text-xs font-medium text-gray-700">
                     અંતિમ તારીખ (વૈકલ્પિક)
                   </label>
                   <input
@@ -337,23 +323,21 @@ export function AdvancedBillManagement() {
                     className="w-full px-3 py-2 text-sm border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block mb-1 text-xs font-medium text-gray-700">
-                  દર પ્રતિ પ્લેટ પ્રતિ દિવસ (₹)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={ratePerDay}
-                  onChange={(e) => setRatePerDay(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 text-sm border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                  placeholder="2.00"
+                <div>
+                  <label className="block mb-1 text-xs font-medium text-gray-700">
+                    દર પ્રતિ પ્લેટ પ્રતિ દિવસ (₹)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={ratePerDay}
+                    onChange={(e) => setRatePerDay(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 text-sm border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                    placeholder="2.00"
                 />
               </div>
-
+              </div>
               <button
                 onClick={handleCalculateBill}
                 disabled={calculating}
@@ -367,7 +351,101 @@ export function AdvancedBillManagement() {
                 ) : (
                   <>
                     <Calculator className="w-4 h-4" />
-                    એડવાન્સ બિલ ગણતરી કરો
+                    બિલ ગણતરી કરો
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {/* Bill Preview */}
+        {billData && (
+          <div className="overflow-hidden bg-white border-2 border-purple-100 shadow-lg rounded-xl">
+            <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500">
+              <h3 className="flex items-center gap-2 text-sm font-bold text-white">
+                <FileText className="w-4 h-4" />
+                બિલ પ્રીવ્યૂ
+              </h3>
+            </div>
+            
+            <div className="p-3 space-y-3">
+              {/* Summary Stats */}
+              <div className="grid grid-cols-4 gap-2">
+                <div className="p-2 text-center border border-blue-200 rounded bg-blue-50">
+                  <div className="text-lg font-bold text-blue-700">{billData.total_days}</div>
+                  <div className="text-xs text-blue-600">કુલ દિવસ</div>
+                </div>
+                <div className="p-2 text-center border border-green-200 rounded bg-green-50">
+                  <div className="text-lg font-bold text-green-700">{billData.date_ranges.length}</div>
+                  <div className="text-xs text-green-600">રેન્જ</div>
+                </div>
+                <div className="p-2 text-center border border-yellow-200 rounded bg-yellow-50">
+                  <div className="text-lg font-bold text-yellow-700">{billData.total_plate_days}</div>
+                  <div className="text-xs text-yellow-600">પ્લેટ-દિવસ</div>
+                </div>
+                <div className="p-2 text-center border border-purple-200 rounded bg-purple-50">
+                  <div className="text-lg font-bold text-purple-700">
+                    ₹{billData.grand_total.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-purple-600">કુલ રકમ</div>
+                </div>
+              </div>
+
+              {/* Date Range Breakdown */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs border border-gray-200 rounded">
+                  <thead>
+                    <tr className="text-white bg-gradient-to-r from-blue-500 to-indigo-500">
+                      <th className="px-2 py-1 text-left">તારીખ શ્રેણી</th>
+                      <th className="px-2 py-1 text-center">પ્લેટ બેલેન્સ</th>
+                      <th className="px-2 py-1 text-center">દિવસ</th>
+                      <th className="px-2 py-1 text-center">દર</th>
+                      <th className="px-2 py-1 text-center">રકમ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {billData.date_ranges.map((range, index) => (
+                      <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                        <td className="px-2 py-1 font-medium">
+                          {range.start_date === range.end_date 
+                            ? new Date(range.start_date).toLocaleDateString('en-GB')
+                            : `${new Date(range.start_date).toLocaleDateString('en-GB')} - ${new Date(range.end_date).toLocaleDateString('en-GB')}`
+                          }
+                        </td>
+                        <td className="px-2 py-1 font-bold text-center text-blue-600">
+                          {range.plate_balance}
+                        </td>
+                        <td className="px-2 py-1 font-bold text-center text-green-600">
+                          {range.days}
+                        </td>
+                        <td className="px-2 py-1 text-center">
+                          ₹{range.rate_per_day.toFixed(2)}
+                        </td>
+                        <td className="px-2 py-1 font-bold text-center text-purple-600">
+                          ₹{range.amount.toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Generate Bill Button */}
+              <button
+                onClick={handleGenerateBill}
+                disabled={generating}
+                className="flex items-center justify-center w-full gap-2 py-3 text-sm font-medium text-white transition-all duration-200 transform rounded-lg shadow-lg bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 hover:shadow-xl hover:scale-105 disabled:opacity-50"
+              >
+                {generating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    બિલ બનાવી રહ્યા છીએ...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    બિલ જનરેટ કરો અને ડાઉનલોડ કરો
                   </>
                 )}
               </button>
@@ -417,7 +495,7 @@ export function AdvancedBillManagement() {
                       />
                       <button
                         onClick={() => removeAdjustment(chargeIndex)}
-                        className="p-1 text-red-600 hover:bg-red-50 rounded"
+                        className="p-1 text-red-600 rounded hover:bg-red-50"
                       >
                         <Minus className="w-3 h-3" />
                       </button>
@@ -425,187 +503,12 @@ export function AdvancedBillManagement() {
                   );
                 })}
                 {adjustments.filter(adj => adj.type === 'charge').length === 0 && (
-                  <p className="text-xs text-gray-500 text-center py-2">કોઈ વધારાના ચાર્જ નથી</p>
-                )}
-              </div>
-            </div>
-
-            {/* Discounts */}
-            <div className="overflow-hidden bg-white border-2 border-green-100 shadow-lg rounded-xl">
-              <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500">
-                <div className="flex items-center justify-between">
-                  <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-                    <Minus className="w-4 h-4" />
-                    ડિસ્કાઉન્ટ
-                  </h3>
-                  <button
-                    onClick={() => addAdjustment('discount')}
-                    className="p-1 text-white rounded hover:bg-green-400/20"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-              
-              <div className="p-3 space-y-2">
-                {adjustments.filter(adj => adj.type === 'discount').map((discount, index) => {
-                  const discountIndex = adjustments.findIndex(adj => adj === discount);
-                  return (
-                    <div key={discountIndex} className="flex gap-2">
-                      <input
-                        type="text"
-                        value={discount.description}
-                        onChange={(e) => updateAdjustment(discountIndex, 'description', e.target.value)}
-                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded"
-                        placeholder="વર્ણન"
-                      />
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={discount.amount}
-                        onChange={(e) => updateAdjustment(discountIndex, 'amount', parseFloat(e.target.value) || 0)}
-                        className="w-20 px-2 py-1 text-xs border border-gray-300 rounded"
-                        placeholder="રકમ"
-                      />
-                      <button
-                        onClick={() => removeAdjustment(discountIndex)}
-                        className="p-1 text-red-600 hover:bg-red-50 rounded"
-                      >
-                        <Minus className="w-3 h-3" />
-                      </button>
-                    </div>
-                  );
-                })}
-                {adjustments.filter(adj => adj.type === 'discount').length === 0 && (
-                  <p className="text-xs text-gray-500 text-center py-2">કોઈ ડિસ્કાઉન્ટ નથી</p>
+                  <p className="py-2 text-xs text-center text-gray-500">કોઈ વધારાના ચાર્જ નથી</p>
                 )}
               </div>
             </div>
           </div>
         )}
-
-        {/* Bill Preview */}
-        {billData && (
-          <div className="overflow-hidden bg-white border-2 border-purple-100 shadow-lg rounded-xl">
-            <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500">
-              <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-                <FileText className="w-4 h-4" />
-                બિલ પ્રીવ્યૂ
-              </h3>
-            </div>
-            
-            <div className="p-3 space-y-3">
-              {/* Summary Stats */}
-              <div className="grid grid-cols-4 gap-2">
-                <div className="p-2 text-center bg-blue-50 border border-blue-200 rounded">
-                  <div className="text-lg font-bold text-blue-700">{billData.total_days}</div>
-                  <div className="text-xs text-blue-600">કુલ દિવસ</div>
-                </div>
-                <div className="p-2 text-center bg-green-50 border border-green-200 rounded">
-                  <div className="text-lg font-bold text-green-700">{billData.date_ranges.length}</div>
-                  <div className="text-xs text-green-600">રેન્જ</div>
-                </div>
-                <div className="p-2 text-center bg-yellow-50 border border-yellow-200 rounded">
-                  <div className="text-lg font-bold text-yellow-700">{billData.total_plate_days}</div>
-                  <div className="text-xs text-yellow-600">પ્લેટ-દિવસ</div>
-                </div>
-                <div className="p-2 text-center bg-purple-50 border border-purple-200 rounded">
-                  <div className="text-lg font-bold text-purple-700">
-                    ₹{billData.grand_total.toFixed(2)}
-                  </div>
-                  <div className="text-xs text-purple-600">કુલ રકમ</div>
-                </div>
-              </div>
-
-              {/* Date Range Breakdown */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs border border-gray-200 rounded">
-                  <thead>
-                    <tr className="text-white bg-gradient-to-r from-blue-500 to-indigo-500">
-                      <th className="px-2 py-1 text-left">તારીખ શ્રેણી</th>
-                      <th className="px-2 py-1 text-center">પ્લેટ બેલેન્સ</th>
-                      <th className="px-2 py-1 text-center">દિવસ</th>
-                      <th className="px-2 py-1 text-center">દર</th>
-                      <th className="px-2 py-1 text-center">રકમ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {billData.date_ranges.map((range, index) => (
-                      <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                        <td className="px-2 py-1 font-medium">
-                          {range.start_date === range.end_date 
-                            ? new Date(range.start_date).toLocaleDateString('en-GB')
-                            : `${new Date(range.start_date).toLocaleDateString('en-GB')} - ${new Date(range.end_date).toLocaleDateString('en-GB')}`
-                          }
-                        </td>
-                        <td className="px-2 py-1 text-center font-bold text-blue-600">
-                          {range.plate_balance}
-                        </td>
-                        <td className="px-2 py-1 text-center font-bold text-green-600">
-                          {range.days}
-                        </td>
-                        <td className="px-2 py-1 text-center">
-                          ₹{range.rate_per_day.toFixed(2)}
-                        </td>
-                        <td className="px-2 py-1 text-center font-bold text-purple-600">
-                          ₹{range.amount.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Generate Bill Button */}
-              <button
-                onClick={handleGenerateBill}
-                disabled={generating}
-                className="flex items-center justify-center w-full gap-2 py-3 text-sm font-medium text-white transition-all duration-200 transform rounded-lg shadow-lg bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 hover:shadow-xl hover:scale-105 disabled:opacity-50"
-              >
-                {generating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    બિલ બનાવી રહ્યા છીએ...
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-4 h-4" />
-                    એડવાન્સ બિલ જનરેટ કરો અને ડાઉનલોડ કરો
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Instructions */}
-        <div className="overflow-hidden bg-white border-2 border-gray-100 shadow-lg rounded-xl">
-          <div className="p-3 bg-gradient-to-r from-gray-500 to-gray-600">
-            <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-              <FileText className="w-4 h-4" />
-              એડવાન્સ બિલિંગ નિયમો
-            </h3>
-          </div>
-          
-          <div className="p-3 space-y-2 text-xs text-gray-600">
-            <div className="flex items-start gap-2">
-              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-1.5"></div>
-              <p><strong>પ્રથમ એન્ટ્રી:</strong> પ્રથમ ચલણ તારીખ = દિવસ 1</p>
-            </div>
-            <div className="flex items-start gap-2">
-              <div className="w-1.5 h-1.5 bg-green-500 rounded-full mt-1.5"></div>
-              <p><strong>મધ્યવર્તી એન્ટ્રી:</strong> દિવસ = આગલી_એન્ટ્રી_તારીખ - વર્તમાન_એન્ટ્રી_તારીખ</p>
-            </div>
-            <div className="flex items-start gap-2">
-              <div className="w-1.5 h-1.5 bg-purple-500 rounded-full mt-1.5"></div>
-              <p><strong>છેલ્લી એન્ટ્રી:</strong> દિવસ = (બિલ_તારીખ - છેલ્લી_એન્ટ્રી_તારીખ) + 1</p>
-            </div>
-            <div className="flex items-start gap-2">
-              <div className="w-1.5 h-1.5 bg-red-500 rounded-full mt-1.5"></div>
-              <p><strong>રકમ:</strong> પ્લેટ_બેલેન્સ × દિવસ × દર_પ્રતિ_દિવસ</p>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

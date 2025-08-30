@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { Database } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { BillGenerator } from './BillGenerator';
+import { EnhancedBillGenerator } from './EnhancedBillGenerator';
 import { BillViewer } from './BillViewer';
 import { 
   Receipt, 
@@ -27,6 +28,7 @@ type Bill = Database['public']['Tables']['bills']['Row'] & {
 };
 
 type ViewMode = 'list' | 'generate' | 'view';
+type BillMode = 'standard' | 'enhanced';
 
 export function BillManagement() {
   const { user } = useAuth();
@@ -38,6 +40,7 @@ export function BillManagement() {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [billMode, setBillMode] = useState<BillMode>('enhanced');
 
   useEffect(() => {
     fetchData();
@@ -139,8 +142,10 @@ export function BillManagement() {
 
   // Generate Bill View
   if (viewMode === 'generate' && selectedClient) {
+    const BillComponent = billMode === 'enhanced' ? EnhancedBillGenerator : BillGenerator;
+    
     return (
-      <BillGenerator
+      <BillComponent
         client={selectedClient}
         onBillGenerated={() => {
           setViewMode('list');
@@ -150,6 +155,7 @@ export function BillManagement() {
         onCancel={() => {
           setViewMode('list');
           setSelectedClient(null);
+          setBillMode('enhanced');
         }}
       />
     );
@@ -182,8 +188,18 @@ export function BillManagement() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
             <Receipt className="w-5 h-5 text-blue-600" />
-            Generate New Bill
+            Generate New Bill (Enhanced)
           </h2>
+          <div className="flex items-center gap-2">
+            <select
+              value={billMode}
+              onChange={(e) => setBillMode(e.target.value as BillMode)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+            >
+              <option value="enhanced">Enhanced Billing (Challan Matching)</option>
+              <option value="standard">Standard Billing</option>
+            </select>
+          </div>
           {!user?.isAdmin && (
             <div className="bg-gray-200 text-gray-500 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 justify-center">
               <Lock className="w-4 h-4" />

@@ -1,6 +1,6 @@
 @@ .. @@
  import React, { useState, useEffect } from 'react';
--import { supabase } from '../../lib/supabase';
+import { AdvancedBillManagement } from './AdvancedBillManagement';
 -import { Database } from '../../lib/supabase';
 -import { useAuth } from '../../hooks/useAuth';
 -import { BillingCalculator, BillingCalculation } from '../../utils/billingCalculator';
@@ -26,7 +26,7 @@
 -type Client = Database['public']['Tables']['clients']['Row'];
 -
  export function BillManagement() {
--  const { user } = useAuth();
+  return <AdvancedBillManagement />;
 -  return <BillManagement />;
 +  return <SimpleBillManagement />;
  }

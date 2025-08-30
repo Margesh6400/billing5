@@ -50,51 +50,6 @@ export class BillingCalculator {
     this.serviceRate = serviceRate;
   }
 
-  async getLastBillEndDate(clientId: string): Promise<string | null> {
-    try {
-      const { data, error } = await supabase
-        .from('bills')
-        .select('billing_period_end')
-        .eq('client_id', clientId)
-        .order('billing_period_end', { ascending: false })
-        .limit(1);
-
-      if (error) throw error;
-      return data && data.length > 0 ? data[0].billing_period_end : null;
-    } catch (error) {
-      console.error('Error fetching last bill end date:', error);
-      return null;
-    }
-  }
-
-  async getFirstTransactionDate(clientId: string): Promise<string | null> {
-    try {
-      const { data: challans } = await supabase
-        .from('challans')
-        .select('challan_date')
-        .eq('client_id', clientId)
-        .order('challan_date', { ascending: true })
-        .limit(1);
-
-      const { data: returns } = await supabase
-        .from('returns')
-        .select('return_date')
-        .eq('client_id', clientId)
-        .order('return_date', { ascending: true })
-        .limit(1);
-
-      const dates = [
-        ...(challans || []).map(c => c.challan_date),
-        ...(returns || []).map(r => r.return_date)
-      ].sort();
-
-      return dates.length > 0 ? dates[0] : null;
-    } catch (error) {
-      console.error('Error fetching first transaction date:', error);
-      return null;
-    }
-  }
-
   async fetchTransactions(clientId: string, startDate: string, endDate: string): Promise<Transaction[]> {
     try {
       // Fetch challans (udhar)
@@ -174,16 +129,7 @@ export class BillingCalculator {
     let runningStock = 0;
     let totalUdharQuantity = 0;
 
-    // Add period start as first date
-    const allDates = [
-      periodStart,
-      ...transactions.map(t => t.date),
-      periodEnd
-    ].sort();
-
-    // Remove duplicates
-    const uniqueDates = [...new Set(allDates)];
-
+    // Process transactions chronologically
     for (let i = 0; i < transactions.length; i++) {
       const transaction = transactions[i];
       const transactionDate = transaction.date;
@@ -201,7 +147,7 @@ export class BillingCalculator {
         runningStock += transactionTotal;
         totalUdharQuantity += transactionTotal;
       } else {
-        runningStock -= transactionTotal;
+        runningStock = Math.max(0, runningStock - transactionTotal);
       }
 
       // Calculate period until next transaction (or end date)
@@ -212,7 +158,7 @@ export class BillingCalculator {
       const fromDate = transactionDate;
       const toDate = nextDate;
       
-      // Calculate days (exclusive of start date, inclusive of end date)
+      // Calculate days
       const daysDiff = Math.floor(
         (new Date(toDate).getTime() - new Date(fromDate).getTime()) / (1000 * 60 * 60 * 24)
       );
@@ -245,27 +191,8 @@ export class BillingCalculator {
       service_charge: serviceCharge,
       period_charges: periodCharges,
       total_amount: totalAmount,
-      net_due: totalAmount // Will be adjusted for previous payments
+      net_due: totalAmount
     };
-  }
-
-  async getPreviousPayments(clientId: string): Promise<number> {
-    try {
-      const { data, error } = await supabase
-        .from('bill_payments')
-        .select(`
-          amount,
-          bills!inner(client_id)
-        `)
-        .eq('bills.client_id', clientId);
-
-      if (error) throw error;
-      
-      return (data || []).reduce((sum, payment) => sum + (payment.amount || 0), 0);
-    } catch (error) {
-      console.error('Error fetching previous payments:', error);
-      return 0;
-    }
   }
 
   async generateNextBillNumber(): Promise<string> {
@@ -281,7 +208,7 @@ export class BillingCalculator {
       let nextNumber = 1;
       if (data && data.length > 0) {
         const lastBillNumber = data[0].bill_number;
-        const match = lastBillNumber.match(/(\d+)$/);
+        const match = lastBillNumber.match(/BILL-(\d+)/);
         if (match) {
           nextNumber = parseInt(match[1]) + 1;
         }
@@ -292,49 +219,5 @@ export class BillingCalculator {
       console.error('Error generating bill number:', error);
       return `BILL-${Date.now().toString().slice(-4)}`;
     }
-  }
-
-  async calculateClientBilling(
-    clientId: string,
-    endDate: string,
-    dailyRate?: number,
-    serviceRate?: number
-  ): Promise<BillingCalculation> {
-    // Update rates if provided
-    if (dailyRate !== undefined) this.dailyRate = dailyRate;
-    if (serviceRate !== undefined) this.serviceRate = serviceRate;
-
-    // Determine start date
-    const lastBillEndDate = await this.getLastBillEndDate(clientId);
-    const firstTransactionDate = await this.getFirstTransactionDate(clientId);
-    
-    let startDate: string;
-    if (lastBillEndDate) {
-      // Start from day after last bill
-      const nextDay = new Date(lastBillEndDate);
-      nextDay.setDate(nextDay.getDate() + 1);
-      startDate = nextDay.toISOString().split('T')[0];
-    } else if (firstTransactionDate) {
-      startDate = firstTransactionDate;
-    } else {
-      // No transactions, use end date as start date
-      startDate = endDate;
-    }
-
-    // Fetch transactions for the period
-    const transactions = await this.fetchTransactions(clientId, startDate, endDate);
-
-    // Calculate billing
-    const calculation = this.calculateBilling(transactions, startDate, endDate);
-
-    // Get previous payments
-    const previousPayments = await this.getPreviousPayments(clientId);
-
-    return {
-      client_id: clientId,
-      ...calculation,
-      previous_payments: previousPayments,
-      net_due: calculation.total_amount - previousPayments
-    };
   }
 }

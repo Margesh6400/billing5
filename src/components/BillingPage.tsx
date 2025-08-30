@@ -1,43 +1,55 @@
-import React, { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
-import { Database } from '../lib/supabase'
-import { Receipt, Search, User, Calendar, DollarSign, Download, Plus, Lock } from 'lucide-react'
-import { useAuth } from '../hooks/useAuth'
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { Database } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
+import { 
+  Receipt, 
+  Search, 
+  User, 
+  Calendar, 
+  DollarSign, 
+  Download, 
+  Plus, 
+  Lock,
+  Calculator,
+  FileText,
+  CreditCard,
+  CheckCircle,
+  Clock,
+  AlertTriangle
+} from 'lucide-react';
+import { BillingCalculator, BillingCalculation } from '../utils/billingCalculator';
+import { generateBillJPG, downloadBillJPG, BillData } from '../utils/billJPGGenerator';
+import { format } from 'date-fns';
 
-type Client = Database['public']['Tables']['clients']['Row']
+type Client = Database['public']['Tables']['clients']['Row'];
 type Bill = Database['public']['Tables']['bills']['Row'] & {
-  clients: Client
-}
-
-const PLATE_SIZES = [
-  '2 X 3',
-  '21 X 3',
-  '18 X 3',
-  '15 X 3',
-  '12 X 3',
-  '9 X 3',
-  'પતરા',
-  '2 X 2',
-  '2 ફુટ'
-]
+  clients: Client;
+};
 
 export function BillingPage() {
-  const { user } = useAuth()
-  const [clients, setClients] = useState<Client[]>([])
-  const [bills, setBills] = useState<Bill[]>([])
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [showCreateForm, setShowCreateForm] = useState(false)
-  const [newBill, setNewBill] = useState({
-    period_start: '',
-    period_end: '',
-    total_amount: 0
-  })
+  const { user } = useAuth();
+  const [clients, setClients] = useState<Client[]>([]);
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [calculating, setCalculating] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  
+  // Billing form state
+  const [billingForm, setBillingForm] = useState({
+    end_date: new Date().toISOString().split('T')[0],
+    daily_rate: 1.00,
+    service_rate: 0.50
+  });
+  
+  const [billingPreview, setBillingPreview] = useState<BillingCalculation | null>(null);
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    fetchData();
+  }, []);
 
   const fetchData = async () => {
     try {
@@ -46,97 +58,222 @@ export function BillingPage() {
         supabase.from('bills').select(`
           *,
           clients (*)
-        `).order('created_at', { ascending: false })
-      ])
+        `).order('generated_at', { ascending: false })
+      ]);
 
-      if (clientsResult.error) throw clientsResult.error
-      if (billsResult.error) throw billsResult.error
+      if (clientsResult.error) throw clientsResult.error;
+      if (billsResult.error) throw billsResult.error;
 
-      setClients(clientsResult.data || [])
-      setBills(billsResult.data || [])
+      setClients(clientsResult.data || []);
+      setBills(billsResult.data || []);
     } catch (error) {
-      console.error('Error fetching data:', error)
+      console.error('Error fetching data:', error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const handleCreateBill = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedClient) return
+  const handleCalculateBilling = async () => {
+    if (!selectedClient) return;
 
+    setCalculating(true);
     try {
-      const { error } = await supabase
+      const calculator = new BillingCalculator(billingForm.daily_rate, billingForm.service_rate);
+      const calculation = await calculator.calculateClientBilling(
+        selectedClient.id,
+        billingForm.end_date,
+        billingForm.daily_rate,
+        billingForm.service_rate
+      );
+      
+      setBillingPreview(calculation);
+    } catch (error) {
+      console.error('Error calculating billing:', error);
+      alert('Error calculating billing. Please try again.');
+    } finally {
+      setCalculating(false);
+    }
+  };
+
+  const handleGenerateBill = async () => {
+    if (!billingPreview || !selectedClient) return;
+
+    setGenerating(true);
+    try {
+      const calculator = new BillingCalculator();
+      const billNumber = await calculator.generateNextBillNumber();
+
+      // Save bill to database
+      const { data: bill, error: billError } = await supabase
         .from('bills')
         .insert([{
+          bill_number: billNumber,
           client_id: selectedClient.id,
-          period_start: newBill.period_start,
-          period_end: newBill.period_end,
-          total_amount: newBill.total_amount,
-          payment_status: 'pending'
+          billing_period_start: billingPreview.period_start,
+          billing_period_end: billingPreview.period_end,
+          total_udhar_quantity: billingPreview.total_udhar_quantity,
+          service_charge: billingPreview.service_charge,
+          period_charges: billingPreview.period_charges,
+          total_amount: billingPreview.total_amount,
+          previous_payments: billingPreview.previous_payments,
+          net_due: billingPreview.net_due,
+          daily_rate: billingForm.daily_rate,
+          service_rate: billingForm.service_rate,
+          payment_status: billingPreview.net_due <= 0 ? 'paid' : 'pending'
         }])
+        .select()
+        .single();
 
-      if (error) throw error
+      if (billError) throw billError;
 
-      setNewBill({ period_start: '', period_end: '', total_amount: 0 })
-      setShowCreateForm(false)
-      setSelectedClient(null)
-      await fetchData()
-      alert('Bill created successfully!')
+      // Save billing periods
+      if (billingPreview.billing_periods.length > 0) {
+        const periodInserts = billingPreview.billing_periods.map(period => ({
+          bill_id: bill.id,
+          period_start: period.from_date,
+          period_end: period.to_date,
+          days_count: period.days,
+          running_stock: period.running_stock,
+          daily_rate: period.daily_rate,
+          period_charge: period.charge
+        }));
+
+        const { error: periodsError } = await supabase
+          .from('bill_periods')
+          .insert(periodInserts);
+
+        if (periodsError) throw periodsError;
+      }
+
+      // Generate and download JPG
+      const billData: BillData = {
+        bill_number: billNumber,
+        client: {
+          id: selectedClient.id,
+          name: selectedClient.name,
+          site: selectedClient.site || '',
+          mobile: selectedClient.mobile_number || ''
+        },
+        bill_date: new Date().toISOString().split('T')[0],
+        period_start: billingPreview.period_start,
+        period_end: billingPreview.period_end,
+        billing_periods: billingPreview.billing_periods,
+        total_udhar_quantity: billingPreview.total_udhar_quantity,
+        service_charge: billingPreview.service_charge,
+        period_charges: billingPreview.period_charges,
+        total_amount: billingPreview.total_amount,
+        previous_payments: billingPreview.previous_payments,
+        net_due: billingPreview.net_due,
+        daily_rate: billingForm.daily_rate,
+        service_rate: billingForm.service_rate
+      };
+
+      const jpgDataUrl = await generateBillJPG(billData);
+      downloadBillJPG(jpgDataUrl, `bill-${billNumber}-${selectedClient.name.replace(/\s+/g, '-')}`);
+
+      // Reset form
+      setSelectedClient(null);
+      setBillingPreview(null);
+      setShowCreateForm(false);
+      setBillingForm({
+        end_date: new Date().toISOString().split('T')[0],
+        daily_rate: 1.00,
+        service_rate: 0.50
+      });
+
+      alert(`Bill ${billNumber} generated successfully!`);
+      await fetchData();
     } catch (error) {
-      console.error('Error creating bill:', error)
-      alert('Error creating bill. Please try again.')
+      console.error('Error generating bill:', error);
+      alert('Error generating bill. Please try again.');
+    } finally {
+      setGenerating(false);
     }
-  }
+  };
 
   const updatePaymentStatus = async (billId: string, status: string) => {
+    if (!user?.isAdmin) return;
+
     try {
       const { error } = await supabase
         .from('bills')
         .update({ payment_status: status })
-        .eq('id', billId)
+        .eq('id', billId);
 
-      if (error) throw error
-      await fetchData()
+      if (error) throw error;
+      await fetchData();
     } catch (error) {
-      console.error('Error updating payment status:', error)
-      alert('Error updating payment status.')
+      console.error('Error updating payment status:', error);
+      alert('Error updating payment status.');
     }
-  }
+  };
 
   const filteredClients = clients.filter(client =>
     client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     client.id.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  );
 
   const filteredBills = bills.filter(bill =>
     bill.clients.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     bill.clients.id.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  );
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'partial':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'pending':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'overdue':
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return <CheckCircle className="w-4 h-4" />;
+      case 'partial':
+        return <Clock className="w-4 h-4" />;
+      case 'pending':
+        return <Clock className="w-4 h-4" />;
+      case 'overdue':
+        return <AlertTriangle className="w-4 h-4" />;
+      default:
+        return <Receipt className="w-4 h-4" />;
+    }
+  };
 
   if (loading) {
     return (
       <div className="space-y-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Billing</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Billing Management</h1>
           <p className="text-gray-600">Loading billing data...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
     <div className="space-y-8">
       {/* Header */}
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Billing</h1>
-        <p className="text-gray-600">Manage client bills and payments</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Billing Management</h1>
+        <p className="text-gray-600">Generate bills and manage client payments</p>
       </div>
 
       {/* Create New Bill */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">Create New Bill</h2>
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <Calculator className="w-5 h-5 text-blue-600" />
+            Generate New Bill
+          </h2>
           {user?.isAdmin ? (
             <button
               onClick={() => setShowCreateForm(!showCreateForm)}
@@ -177,8 +314,8 @@ export function BillingPage() {
                     <button
                       key={client.id}
                       onClick={() => {
-                        setSelectedClient(client)
-                        setSearchTerm('')
+                        setSelectedClient(client);
+                        setSearchTerm('');
                       }}
                       className="w-full text-left p-3 hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
                     >
@@ -197,72 +334,178 @@ export function BillingPage() {
               )}
             </div>
 
-            {/* Bill Form */}
+            {/* Billing Parameters */}
             {selectedClient && (
-              <form onSubmit={handleCreateBill} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Period Start Date
-                    </label>
-                    <input
-                      type="date"
-                      value={newBill.period_start}
-                      onChange={(e) => setNewBill({ ...newBill, period_start: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Period End Date
-                    </label>
-                    <input
-                      type="date"
-                      value={newBill.period_end}
-                      onChange={(e) => setNewBill({ ...newBill, period_end: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
-                      required
-                    />
-                  </div>
-                </div>
-                
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Total Amount (₹)
+                    Billing End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={billingForm.end_date}
+                    onChange={(e) => setBillingForm({ ...billingForm, end_date: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Daily Rate (₹)
                   </label>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
-                    value={newBill.total_amount}
-                    onChange={(e) => setNewBill({ ...newBill, total_amount: parseFloat(e.target.value) || 0 })}
+                    value={billingForm.daily_rate}
+                    onChange={(e) => setBillingForm({ ...billingForm, daily_rate: parseFloat(e.target.value) || 0 })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
-                    placeholder="0.00"
+                    placeholder="1.00"
                     required
                   />
                 </div>
-
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    type="submit"
-                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg text-base font-medium transition-colors"
-                  >
-                    Create Bill
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowCreateForm(false)
-                      setSelectedClient(null)
-                      setSearchTerm('')
-                    }}
-                    className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg text-base font-medium transition-colors"
-                  >
-                    Cancel
-                  </button>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Service Rate (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={billingForm.service_rate}
+                    onChange={(e) => setBillingForm({ ...billingForm, service_rate: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                    placeholder="0.50"
+                    required
+                  />
                 </div>
-              </form>
+              </div>
+            )}
+
+            {/* Calculate Button */}
+            {selectedClient && (
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCalculateBilling}
+                  disabled={calculating}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg text-base font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+                >
+                  {calculating ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white rounded-full border-t-transparent animate-spin" />
+                      Calculating...
+                    </>
+                  ) : (
+                    <>
+                      <Calculator className="w-5 h-5" />
+                      Calculate Bill
+                    </>
+                  )}
+                </button>
+                
+                {billingPreview && (
+                  <button
+                    onClick={handleGenerateBill}
+                    disabled={generating}
+                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg text-base font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {generating ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white rounded-full border-t-transparent animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-5 h-5" />
+                        Generate Bill
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Billing Preview */}
+            {billingPreview && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Billing Preview</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-medium text-gray-700 mb-3">Period Information</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Period:</span>
+                        <span className="font-medium">
+                          {format(new Date(billingPreview.period_start), 'dd/MM/yyyy')} - 
+                          {format(new Date(billingPreview.period_end), 'dd/MM/yyyy')}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Total Udhar Quantity:</span>
+                        <span className="font-medium">{billingPreview.total_udhar_quantity} plates</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Billing Periods:</span>
+                        <span className="font-medium">{billingPreview.billing_periods.length}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium text-gray-700 mb-3">Amount Breakdown</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Period Charges:</span>
+                        <span className="font-medium">₹{billingPreview.period_charges.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Service Charge:</span>
+                        <span className="font-medium">₹{billingPreview.service_charge.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Previous Payments:</span>
+                        <span className="font-medium text-green-600">-₹{billingPreview.previous_payments.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-2">
+                        <span className="font-semibold">Net Due:</span>
+                        <span className="font-bold text-lg text-red-600">₹{billingPreview.net_due.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Billing Periods Detail */}
+                {billingPreview.billing_periods.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className="font-medium text-gray-700 mb-3">Billing Periods Detail</h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm border border-gray-200 rounded-lg">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="px-3 py-2 text-left">From</th>
+                            <th className="px-3 py-2 text-left">To</th>
+                            <th className="px-3 py-2 text-center">Days</th>
+                            <th className="px-3 py-2 text-center">Stock</th>
+                            <th className="px-3 py-2 text-right">Charge</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {billingPreview.billing_periods.map((period, index) => (
+                            <tr key={index} className="border-t">
+                              <td className="px-3 py-2">{format(new Date(period.from_date), 'dd/MM/yyyy')}</td>
+                              <td className="px-3 py-2">{format(new Date(period.to_date), 'dd/MM/yyyy')}</td>
+                              <td className="px-3 py-2 text-center">{period.days}</td>
+                              <td className="px-3 py-2 text-center">{period.running_stock}</td>
+                              <td className="px-3 py-2 text-right">₹{period.charge.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -270,7 +513,10 @@ export function BillingPage() {
 
       {/* Bills List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-6">All Bills</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
+          <Receipt className="w-5 h-5 text-blue-600" />
+          All Bills
+        </h2>
         
         <div className="space-y-4">
           {filteredBills.length === 0 ? (
@@ -288,11 +534,12 @@ export function BillingPage() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900">{bill.clients.name}</h3>
-                      <p className="text-sm text-gray-600">ID: {bill.clients.id}</p>
+                      <p className="text-sm text-gray-600">Bill: {bill.bill_number}</p>
                       <div className="flex items-center gap-4 mt-1">
                         <div className="flex items-center gap-1 text-sm text-gray-500">
                           <Calendar className="w-4 h-4" />
-                          {new Date(bill.period_start).toLocaleDateString()} - {new Date(bill.period_end).toLocaleDateString()}
+                          {format(new Date(bill.billing_period_start), 'dd/MM/yyyy')} - 
+                          {format(new Date(bill.billing_period_end), 'dd/MM/yyyy')}
                         </div>
                         <div className="flex items-center gap-1 text-sm text-gray-500">
                           <DollarSign className="w-4 h-4" />
@@ -307,26 +554,16 @@ export function BillingPage() {
                       <select
                         value={bill.payment_status}
                         onChange={(e) => updatePaymentStatus(bill.id, e.target.value)}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium border ${
-                          bill.payment_status === 'paid' 
-                            ? 'bg-green-50 border-green-200 text-green-800'
-                            : bill.payment_status === 'overdue'
-                            ? 'bg-red-50 border-red-200 text-red-800'
-                            : 'bg-yellow-50 border-yellow-200 text-yellow-800'
-                        }`}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium border flex items-center gap-2 ${getStatusColor(bill.payment_status)}`}
                       >
                         <option value="pending">Pending</option>
+                        <option value="partial">Partial</option>
                         <option value="paid">Paid</option>
                         <option value="overdue">Overdue</option>
                       </select>
                     ) : (
-                      <span className={`px-3 py-2 rounded-lg text-sm font-medium border ${
-                        bill.payment_status === 'paid' 
-                          ? 'bg-green-50 border-green-200 text-green-800'
-                          : bill.payment_status === 'overdue'
-                          ? 'bg-red-50 border-red-200 text-red-800'
-                          : 'bg-yellow-50 border-yellow-200 text-yellow-800'
-                      }`}>
+                      <span className={`px-3 py-2 rounded-lg text-sm font-medium border flex items-center gap-2 ${getStatusColor(bill.payment_status)}`}>
+                        {getStatusIcon(bill.payment_status)}
                         {bill.payment_status.charAt(0).toUpperCase() + bill.payment_status.slice(1)}
                       </span>
                     )}
@@ -337,11 +574,33 @@ export function BillingPage() {
                     </button>
                   </div>
                 </div>
+                
+                {/* Bill Summary */}
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">Period Charges:</span>
+                      <p className="font-medium">₹{bill.period_charges.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Service Charge:</span>
+                      <p className="font-medium">₹{bill.service_charge.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Previous Payments:</span>
+                      <p className="font-medium text-green-600">₹{bill.previous_payments.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Net Due:</span>
+                      <p className="font-bold text-red-600">₹{bill.net_due.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             ))
           )}
         </div>
       </div>
     </div>
-  )
+  );
 }

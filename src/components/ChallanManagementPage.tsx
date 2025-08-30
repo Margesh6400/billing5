@@ -919,7 +919,7 @@ export function ChallanManagementPage() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="ગ્રાહક શોધો..."
+                placeholder="ચલણ નંબર શોઘો..."
                 className="w-full py-3 pl-10 pr-4 text-sm transition-all duration-200 border-2 border-blue-200 rounded-lg focus:ring-4 focus:ring-blue-100 focus:border-blue-500"
               />
             </div>

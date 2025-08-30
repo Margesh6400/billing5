@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { BillManagement } from './BillManagement';
 import { 
   Receipt, 
   Search, 

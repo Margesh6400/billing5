@@ -27,6 +27,10 @@ export interface BillData {
   net_due: number;
   daily_rate: number;
   service_rate: number;
+  manual_items?: Array<{
+    description: string;
+    amount: number;
+  }>;
 }
 
 export const generateBillJPG = async (data: BillData): Promise<string> => {
@@ -52,12 +56,20 @@ export const generateBillJPG = async (data: BillData): Promise<string> => {
     return new Date(dateString).toLocaleDateString('en-GB');
   };
 
+  // Calculate days between dates (inclusive)
+  const calculateDays = (fromDate: string, toDate: string) => {
+    const from = new Date(fromDate);
+    const to = new Date(toDate);
+    const diffTime = Math.abs(to.getTime() - from.getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  };
   tempDiv.innerHTML = `
     <div style="width:1200px;padding:40px;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#222;background:#ffffff;border:2px solid #1e40af;">
       <!-- Header -->
       <div style="text-align:center;margin-bottom:30px;border-bottom:3px solid #1e40af;padding-bottom:20px;">
         <h1 style="font-size:42px;font-weight:bold;color:#1e40af;margin:0;">નીલકંઠ પ્લેટ ડેપો</h1>
         <p style="font-size:18px;color:#666;margin:5px 0;">Centering Plates Rental Service</p>
+        <p style="font-size:14px;color:#888;margin:5px 0;">સેન્ટરિંગ પ્લેટ્સ ભાડા સેવા</p>
         <h2 style="font-size:32px;font-weight:bold;color:#dc2626;margin:15px 0;">BILL / બિલ</h2>
       </div>
 
@@ -95,60 +107,66 @@ export const generateBillJPG = async (data: BillData): Promise<string> => {
           <thead>
             <tr style="background:#1e40af;color:white;">
               <th style="padding:12px;text-align:center;border:1px solid #1e40af;">Sr No</th>
+              <th style="padding:12px;text-align:left;border:1px solid #1e40af;">Description</th>
               <th style="padding:12px;text-align:center;border:1px solid #1e40af;">From Date</th>
               <th style="padding:12px;text-align:center;border:1px solid #1e40af;">To Date</th>
+              <th style="padding:12px;text-align:center;border:1px solid #1e40af;">Udhar Qty</th>
+              <th style="padding:12px;text-align:center;border:1px solid #1e40af;">Jama Qty</th>
+              <th style="padding:12px;text-align:center;border:1px solid #1e40af;">Plates on Rent</th>
+              <th style="padding:12px;text-align:center;border:1px solid #1e40af;">Rate/Plate</th>
               <th style="padding:12px;text-align:center;border:1px solid #1e40af;">Days</th>
-              <th style="padding:12px;text-align:center;border:1px solid #1e40af;">Running Stock</th>
-              <th style="padding:12px;text-align:center;border:1px solid #1e40af;">Daily Rate</th>
-              <th style="padding:12px;text-align:center;border:1px solid #1e40af;">Charge</th>
+              <th style="padding:12px;text-align:right;border:1px solid #1e40af;">Amount (₹)</th>
             </tr>
           </thead>
           <tbody>
             ${data.billing_periods.map((period, index) => `
               <tr style="background:${index % 2 === 0 ? '#f8fafc' : 'white'};">
                 <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;">${index + 1}</td>
+                <td style="padding:10px;text-align:left;border:1px solid #e2e8f0;">Rental Period ${index + 1}</td>
                 <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;">${formatDate(period.from_date)}</td>
                 <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;">${formatDate(period.to_date)}</td>
-                <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;">${period.days}</td>
-                <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;">${period.running_stock}</td>
+                <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;color:#dc2626;font-weight:bold;">-</td>
+                <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;color:#059669;font-weight:bold;">-</td>
+                <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;color:#2563eb;font-weight:bold;">${period.running_stock}</td>
                 <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;">${formatCurrency(period.daily_rate)}</td>
-                <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;font-weight:bold;">${formatCurrency(period.charge)}</td>
+                <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;">${period.days}</td>
+                <td style="padding:10px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;">${formatCurrency(period.charge)}</td>
               </tr>
             `).join('')}
+            ${data.manual_items ? data.manual_items.map((item, index) => `
+              <tr style="background:#fef3c7;">
+                <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;">${data.billing_periods.length + index + 1}</td>
+                <td style="padding:10px;text-align:left;border:1px solid #e2e8f0;font-style:italic;">${item.description}</td>
+                <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;">-</td>
+                <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;">-</td>
+                <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;">-</td>
+                <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;">-</td>
+                <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;">-</td>
+                <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;">-</td>
+                <td style="padding:10px;text-align:center;border:1px solid #e2e8f0;">-</td>
+                <td style="padding:10px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;">${formatCurrency(item.amount)}</td>
+              </tr>
+            `).join('') : ''}
             ${data.billing_periods.length === 0 ? `
               <tr>
-                <td colspan="7" style="padding:20px;text-align:center;color:#666;border:1px solid #e2e8f0;">No billing periods in this range</td>
+                <td colspan="10" style="padding:20px;text-align:center;color:#666;border:1px solid #e2e8f0;">No billing periods in this range</td>
               </tr>
             ` : ''}
+            <!-- Grand Total Row -->
+            <tr style="background:#e0e7ff;border-top:3px solid #1e40af;">
+              <td colspan="9" style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-size:18px;font-weight:bold;">Grand Total / કુલ રકમ:</td>
+              <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-size:20px;font-weight:bold;color:#dc2626;">${formatCurrency(data.total_amount)}</td>
+            </tr>
           </tbody>
         </table>
       </div>
 
-      <!-- Charges Summary -->
-      <div style="margin-bottom:25px;background:#f8fafc;padding:20px;border-radius:8px;border:2px solid #e2e8f0;">
-        <h3 style="margin:0 0 15px 0;font-size:20px;color:#1e40af;">Charges Summary</h3>
-        <div style="display:grid;grid-template-columns:1fr auto;gap:15px;font-size:16px;">
-          <div>Period Charges:</div>
-          <div style="font-weight:bold;">${formatCurrency(data.period_charges)}</div>
-          
-          <div>Service Charge (${data.total_udhar_quantity} plates × ${formatCurrency(data.service_rate)}):</div>
-          <div style="font-weight:bold;">${formatCurrency(data.service_charge)}</div>
-          
-          <div style="border-top:2px solid #1e40af;padding-top:10px;font-size:18px;font-weight:bold;">Total Amount:</div>
-          <div style="border-top:2px solid #1e40af;padding-top:10px;font-size:18px;font-weight:bold;color:#dc2626;">${formatCurrency(data.total_amount)}</div>
-          
-          <div>Previous Payments:</div>
-          <div style="font-weight:bold;color:#059669;">- ${formatCurrency(data.previous_payments)}</div>
-          
-          <div style="border-top:2px solid #dc2626;padding-top:10px;font-size:20px;font-weight:bold;color:#dc2626;">Net Due:</div>
-          <div style="border-top:2px solid #dc2626;padding-top:10px;font-size:20px;font-weight:bold;color:#dc2626;">${formatCurrency(data.net_due)}</div>
-        </div>
-      </div>
 
       <!-- Payment Methods -->
       <div style="margin-bottom:25px;background:#fef3c7;padding:15px;border-radius:8px;border-left:4px solid #f59e0b;">
         <h4 style="margin:0 0 10px 0;font-size:16px;color:#92400e;">Payment Methods:</h4>
         <p style="margin:0;font-size:14px;color:#92400e;">Cash | Online Transfer | Cheque | Bank Transfer</p>
+        <p style="margin:5px 0 0 0;font-size:12px;color:#92400e;">રોકડ | ઓનલાઇન ટ્રાન્સફર | ચેક | બેંક ટ્રાન્સફર</p>
       </div>
 
       <!-- Footer -->
@@ -156,9 +174,11 @@ export const generateBillJPG = async (data: BillData): Promise<string> => {
         <div style="display:flex;justify-content:space-between;margin-bottom:30px;">
           <div style="text-align:center;width:200px;">
             <div style="border-top:2px solid #000;margin-top:60px;padding-top:5px;font-size:14px;">Client's Signature</div>
+            <div style="font-size:12px;color:#666;margin-top:2px;">ગ્રાહકની સહી</div>
           </div>
           <div style="text-align:center;width:200px;">
             <div style="border-top:2px solid #000;margin-top:60px;padding-top:5px;font-size:14px;">Authorized Signature</div>
+            <div style="font-size:12px;color:#666;margin-top:2px;">અધિકૃત સહી</div>
           </div>
         </div>
         

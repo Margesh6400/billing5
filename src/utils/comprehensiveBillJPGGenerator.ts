@@ -36,22 +36,20 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
       <!-- Header -->
       <div style="text-align:center;margin-bottom:30px;border-bottom:3px solid #1e40af;padding-bottom:20px;">
         <h1 style="font-size:48px;font-weight:bold;color:#1e40af;margin:0;">નીલકંઠ પ્લેટ ડેપો</h1>
-        <p style="font-size:20px;color:#666;margin:8px 0;">Centering Plates Rental Service</p>
         <p style="font-size:16px;color:#888;margin:8px 0;">સેન્ટરિંગ પ્લેટ્સ ભાડા સેવા</p>
-        <h2 style="font-size:36px;font-weight:bold;color:#dc2626;margin:20px 0;background:#fee2e2;padding:15px;border-radius:8px;">RENT BILL – ${data.client.name.toUpperCase()}</h2>
-      </div>
+       </div>
 
       <!-- Client Details -->
       <div style="margin-bottom:25px;background:#f1f5f9;padding:20px;border-radius:8px;border-left:4px solid #1e40af;">
         <h3 style="margin:0 0 15px 0;font-size:22px;color:#1e40af;font-weight:bold;">Client Information / ગ્રાહક માહિતી</h3>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
           <div>
-            <p style="margin:0;font-size:18px;"><strong>Name / નામ:</strong> ${data.client.name}</p>
+            <p style="margin:0;font-size:18px;"><strong>નામ:</strong> ${data.client.name}</p>
             <p style="margin:8px 0 0 0;font-size:16px;"><strong>Client ID:</strong> ${data.client.id}</p>
           </div>
           <div>
-            <p style="margin:0;font-size:18px;"><strong>Site / સાઇટ:</strong> ${data.client.site || '-'}</p>
-            <p style="margin:8px 0 0 0;font-size:16px;"><strong>Mobile / મોબાઇલ:</strong> ${data.client.mobile_number || '-'}</p>
+            <p style="margin:0;font-size:18px;"><strong>સાઇટ:</strong> ${data.client.site || '-'}</p>
+            <p style="margin:8px 0 0 0;font-size:16px;"><strong>મોબાઇલ:</strong> ${data.client.mobile_number || '-'}</p>
           </div>
         </div>
         <div style="margin-top:15px;padding:10px;background:#e0e7ff;border-radius:6px;">
@@ -150,72 +148,15 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
         </div>
       </div>
 
-      <!-- Billing Summary -->
-      <div style="margin-bottom:30px;background:#f0f9ff;padding:20px;border-radius:8px;border-left:4px solid #0ea5e9;">
-        <h4 style="margin:0 0 15px 0;font-size:18px;color:#0c4a6e;font-weight:bold;">Billing Summary / બિલિંગ સારાંશ:</h4>
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:15px;font-size:14px;color:#0c4a6e;">
-          <div><strong>Total Plates Issued:</strong> ${data.total_plates_issued}</div>
-          <div><strong>Total Plates Returned:</strong> ${data.total_plates_issued - data.lost_plates_count}</div>
-          <div><strong>Lost Plates:</strong> ${data.lost_plates_count}</div>
-          <div><strong>Billing Periods:</strong> ${data.date_ranges.length}</div>
-          <div><strong>Daily Rate:</strong> ${formatCurrency(data.rates.daily_rent_rate)}</div>
-          <div><strong>Service Rate:</strong> ${formatCurrency(data.rates.service_charge_rate)}</div>
-        </div>
-      </div>
-
-      <!-- Payment Methods -->
-      <div style="margin-bottom:30px;background:#fef3c7;padding:20px;border-radius:8px;border-left:4px solid #f59e0b;">
-        <h4 style="margin:0 0 15px 0;font-size:18px;color:#92400e;font-weight:bold;">Payment Methods / ચુકવણીની પદ્ધતિ:</h4>
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:15px;font-size:16px;color:#92400e;">
-          <div>• Cash / રોકડ</div>
-          <div>• Online Transfer / ઓનલાઇન ટ્રાન્સફર</div>
-          <div>• Cheque / ચેક</div>
-          <div>• Bank Transfer / બેંક ટ્રાન્સફર</div>
-        </div>
-      </div>
-
-      <!-- Terms and Conditions -->
-      <div style="margin-bottom:30px;background:#f0fdf4;padding:20px;border-radius:8px;border-left:4px solid #22c55e;">
-        <h4 style="margin:0 0 15px 0;font-size:18px;color:#166534;font-weight:bold;">Terms & Conditions / નિયમો અને શરતો:</h4>
-        <ul style="margin:0;padding-left:25px;font-size:14px;color:#166534;line-height:1.8;">
-          <li>Payment due within 30 days of bill date / બિલ તારીખથી 30 દિવસમાં ચુકવણી</li>
-          <li>Late payment charges may apply / મોડી ચુકવણી માટે વધારાનો ચાર્જ લાગુ પડી શકે</li>
-          <li>Lost plates charged at ₹${data.rates.lost_plate_penalty} per plate / ગુમ પ્લેટ દંડ ₹${data.rates.lost_plate_penalty} પ્રતિ પ્લેટ</li>
-          <li>First issue date is Day 1, billing starts from Day 2 / પ્રથમ ઇશ્યૂ તારીખ દિવસ 1, બિલિંગ દિવસ 2 થી શરૂ</li>
-          <li>All disputes subject to local jurisdiction / બધા વિવાદો સ્થાનિક અધિકારક્ષેત્રને આધીન</li>
-        </ul>
-      </div>
-
-      <!-- Billing Formula Explanation -->
-      <div style="margin-bottom:30px;background:#fef7ff;padding:20px;border-radius:8px;border-left:4px solid #a855f7;">
-        <h4 style="margin:0 0 15px 0;font-size:18px;color:#7c3aed;font-weight:bold;">Billing Formula / બિલિંગ ફોર્મ્યુલા:</h4>
-        <div style="font-size:16px;color:#7c3aed;line-height:1.8;">
-          <p style="margin:0 0 8px 0;"><strong>Rent Formula:</strong> Plate Balance × Days × Daily Rate (₹${data.rates.daily_rent_rate})</p>
-          <p style="margin:0 0 8px 0;"><strong>Service Charge:</strong> Total Issued Plates × Service Rate (₹${data.rates.service_charge_rate})</p>
-          <p style="margin:0 0 8px 0;"><strong>Worker Charge:</strong> Fixed amount (₹${data.rates.worker_charge})</p>
-          <p style="margin:0;"><strong>Lost Plate Penalty:</strong> Missing Plates × Penalty Rate (₹${data.rates.lost_plate_penalty})</p>
-        </div>
-      </div>
-
       <!-- Footer -->
       <div style="margin-top:40px;text-align:center;border-top:3px solid #1e40af;padding-top:25px;">
-        <div style="display:flex;justify-content:space-between;margin-bottom:40px;">
-          <div style="text-align:center;width:250px;">
-            <div style="border-top:2px solid #000;margin-top:80px;padding-top:8px;font-size:16px;font-weight:600;">Client's Signature</div>
-            <div style="font-size:14px;color:#666;margin-top:5px;">ગ્રાહકની સહી</div>
-          </div>
-          <div style="text-align:center;width:250px;">
-            <div style="border-top:2px solid #000;margin-top:80px;padding-top:8px;font-size:16px;font-weight:600;">Authorized Signature</div>
-            <div style="font-size:14px;color:#666;margin-top:5px;">અધિકૃત સહી</div>
-          </div>
-        </div>
-        
         <div style="font-size:28px;font-weight:bold;color:#1e40af;margin-bottom:15px;">આભાર! ફરી મળીએ.</div>
         <div style="font-size:16px;color:#666;margin-bottom:8px;">
           સુરેશભાઈ પોલરા: +91 93287 28228 | હરેશભાઈ પોલરા: +91 90992 64436
         </div>
         <div style="font-size:14px;color:#999;margin-top:15px;">
-          Generated: ${new Date().toLocaleString('en-IN')} | NO WERE TECH Comprehensive Billing System
+        Generated: ${new Date().toLocaleString('en-IN')} | NO WERE TECH Comprehensive Billing System
+        </div>
         </div>
       </div>
     </div>

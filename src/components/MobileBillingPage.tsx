@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ComprehensiveBillManagement } from './billing/ComprehensiveBillManagement';
+import { GujaratiBillManagement } from './billing/GujaratiBillManagement';
 
 export function MobileBillingPage() {
-  return <ComprehensiveBillManagement />;
+  return <GujaratiBillManagement />;
 }

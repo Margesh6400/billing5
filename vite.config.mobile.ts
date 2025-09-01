@@ -26,7 +26,8 @@ export default defineConfig({
       '@capacitor/app',
       '@capacitor/haptics',
       '@capacitor/keyboard',
-      '@capacitor/status-bar'
+      '@capacitor/status-bar',
+      '@capacitor/splash-screen'
     ],
     exclude: ['lucide-react']
   },

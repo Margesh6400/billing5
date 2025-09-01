@@ -1,3 +1,6 @@
+import udharTemplate from '../assets/UdharReceiptTemplate_11zon.jpg';
+import jamaTemplate from '../assets/JamaReceiptTemplate_11zon.jpg';
+
 export interface ChallanData {
   type: 'issue' | 'return';
   challan_number: string;
@@ -37,8 +40,8 @@ interface TemplateCoordinates {
 }
 
 const TEMPLATES = {
-  issue: 'https://images.pexels.com/photos/6863183/pexels-photo-6863183.jpeg',
-  return: 'https://images.pexels.com/photos/6863183/pexels-photo-6863183.jpeg'
+  issue: udharTemplate,
+  return: jamaTemplate
 };
 
 // Adjusted coordinates based on actual template analysis

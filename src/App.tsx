@@ -10,7 +10,7 @@ import { MobileClientsPage } from './components/MobileClientsPage'
 import { MobileStockPage } from './components/MobileStockPage'
 import { MobileLedgerPage } from './components/mobile/MobileLedgerPage'
 import { ChallanManagementPage } from './components/ChallanManagementPage'
-import { MobileBillingPage } from './components/MobileBillingPage'
+import { BillManagementPage } from './components/BillManagementPage'
 import { LanguageProvider } from './contexts/LanguageContext'
 import { Loader2 } from 'lucide-react'
 
@@ -44,7 +44,7 @@ function App() {
           <Route path="/stock" element={<MobileStockPage />} />
           <Route path="/ledger" element={<MobileLedgerPage />} />
           <Route path="/challans" element={<ChallanManagementPage />} />
-          <Route path="/bills" element={<MobileBillingPage />} />
+          <Route path="/bills" element={<BillManagementPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </MobileLayout>

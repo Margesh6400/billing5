@@ -288,7 +288,7 @@ export class EnhancedGujaratiBillingCalculator {
     const lostPlatesCount = Math.max(0, totalPlatesIssued - totalPlatesReturned);
 
     // Calculate core charges
-    const serviceCharge = totalPlatesIssued * finalRates.service_charge_rate;
+    const serviceCharge = 0; // Service charge removed
     const workerCharge = finalRates.worker_charge;
     const lostPlatePenalty = lostPlatesCount * finalRates.lost_plate_penalty;
 
@@ -305,7 +305,7 @@ export class EnhancedGujaratiBillingCalculator {
     const totalPayments = payments.reduce((sum, payment) => sum + payment.payment_amount, 0);
 
     // Step 7: NEW - Enhanced total calculation
-    const coreTotal = totalRent + serviceCharge + workerCharge + lostPlatePenalty;
+    const coreTotal = totalRent + workerCharge + lostPlatePenalty;
     const adjustedTotal = coreTotal + extraChargesTotal - discountsTotal;
     const finalDue = Math.max(0, adjustedTotal - (advancePaid + totalPayments));
 

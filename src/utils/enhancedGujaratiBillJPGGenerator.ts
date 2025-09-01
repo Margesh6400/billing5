@@ -115,10 +115,6 @@ export const generateEnhancedGujaratiBillJPG = async (data: EnhancedGujaratiBill
           <!-- Charges Table -->
           <table style="width:100%;border-collapse:collapse;font-size:16px;">
             <tbody>
-              <tr style="background:#f0fdf4;">
-                <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">સર્વિસ ચાર્જ / Service Charge (${data.total_plates_issued} × ₹${data.rates.service_charge_rate}):</td>
-                <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#059669;">${formatCurrency(data.service_charge)}</td>
-              </tr>
               <tr style="background:white;">
                 <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">મજૂરી ચાર્જ / Worker/Handling Charge:</td>
                 <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#059669;">${formatCurrency(data.worker_charge)}</td>
@@ -130,168 +126,26 @@ export const generateEnhancedGujaratiBillJPG = async (data: EnhancedGujaratiBill
                 </tr>
               ` : ''}
               
-              <!-- Core Total Row -->
-              <tr style="background:#dcfce7;border-top:2px solid #059669;">
-                <td style="padding:15px;border:1px solid #e2e8f0;font-size:18px;font-weight:bold;">મૂળ કુલ / Core Total:</td>
-                <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-size:18px;font-weight:bold;color:#059669;">${formatCurrency(data.core_total)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- NEW: Extra Charges & Discounts Section -->
-      ${(extraCharges.length > 0 || discounts.length > 0) ? `
-        <div style="margin-bottom:30px;">
-          <div style="border:2px solid #f59e0b;border-radius:8px;overflow:hidden;">
-            <div style="background:#f59e0b;color:white;padding:15px;text-align:center;">
-              <h3 style="margin:0;font-size:20px;font-weight:bold;">વધારાના ચાર્જ / ડિસ્કાઉન્ટ્સ</h3>
-            </div>
-            
-            <table style="width:100%;border-collapse:collapse;font-size:16px;">
-              <thead>
-                <tr style="background:#fef3c7;">
-                  <th style="padding:12px;text-align:left;border:1px solid #e2e8f0;font-weight:bold;">વર્ણન / Description</th>
-                  <th style="padding:12px;text-align:center;border:1px solid #e2e8f0;font-weight:bold;">સંખ્યા / Count</th>
-                  <th style="padding:12px;text-align:center;border:1px solid #e2e8f0;font-weight:bold;">દર / Price</th>
-                  <th style="padding:12px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;">કુલ / Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${extraCharges.map((item, index) => `
-                  <tr style="background:${index % 2 === 0 ? '#fef3c7' : '#fffbeb'};">
-                    <td style="padding:12px;border:1px solid #e2e8f0;font-weight:600;">${item.note}</td>
-                    <td style="padding:12px;text-align:center;border:1px solid #e2e8f0;font-weight:bold;">${item.item_count}</td>
-                    <td style="padding:12px;text-align:center;border:1px solid #e2e8f0;font-weight:bold;">${formatCurrency(item.price)}</td>
-                    <td style="padding:12px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#dc2626;">${formatCurrency(item.total)}</td>
-                  </tr>
-                `).join('')}
-                
-                ${discounts.map((item, index) => `
-                  <tr style="background:${index % 2 === 0 ? '#dcfce7' : '#f0fdf4'};">
-                    <td style="padding:12px;border:1px solid #e2e8f0;font-weight:600;">${item.note}</td>
-                    <td style="padding:12px;text-align:center;border:1px solid #e2e8f0;font-weight:bold;">${item.item_count}</td>
-                    <td style="padding:12px;text-align:center;border:1px solid #e2e8f0;font-weight:bold;">${formatCurrency(item.price)}</td>
-                    <td style="padding:12px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#059669;">-${formatCurrency(Math.abs(item.total))}</td>
-                  </tr>
-                `).join('')}
-                
-                <!-- Extra Items Subtotal -->
-                <tr style="background:#f59e0b;color:white;border-top:2px solid #f59e0b;">
-                  <td colspan="3" style="padding:15px;text-align:right;border:1px solid #f59e0b;font-size:16px;font-weight:bold;">કુલ વધારાના ચાર્જ - ડિસ્કાઉન્ટ:</td>
-                  <td style="padding:15px;text-align:right;border:1px solid #f59e0b;font-size:16px;font-weight:bold;">${formatCurrency(data.extra_charges_total - data.discounts_total)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ` : ''}
-
-      <!-- NEW: Payments Section -->
-      ${data.payments.length > 0 ? `
-        <div style="margin-bottom:30px;">
-          <div style="border:2px solid #7c3aed;border-radius:8px;overflow:hidden;">
-            <div style="background:#7c3aed;color:white;padding:15px;text-align:center;">
-              <h3 style="margin:0;font-size:20px;font-weight:bold;">ચુકવણી / PAYMENTS</h3>
-            </div>
-            
-            <table style="width:100%;border-collapse:collapse;font-size:16px;">
-              <thead>
-                <tr style="background:#f3e8ff;">
-                  <th style="padding:12px;text-align:left;border:1px solid #e2e8f0;font-weight:bold;">વર્ણન / Description</th>
-                  <th style="padding:12px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;">રકમ / Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${data.advance_paid > 0 ? `
-                  <tr style="background:#f3e8ff;">
-                    <td style="padding:12px;border:1px solid #e2e8f0;font-weight:600;">અગાઉથી ચૂકવેલ / Advance Paid:</td>
-                    <td style="padding:12px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#7c3aed;">${formatCurrency(data.advance_paid)}</td>
-                  </tr>
-                ` : ''}
-                
-                ${data.payments.map((payment, index) => `
-                  <tr style="background:${index % 2 === 0 ? '#f3e8ff' : 'white'};">
-                    <td style="padding:12px;border:1px solid #e2e8f0;font-weight:600;">${payment.note}:</td>
-                    <td style="padding:12px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#7c3aed;">${formatCurrency(payment.payment_amount)}</td>
-                  </tr>
-                `).join('')}
-                
-                <!-- Total Payments Row -->
-                <tr style="background:#7c3aed;color:white;border-top:2px solid #7c3aed;">
-                  <td style="padding:15px;border:1px solid #7c3aed;font-size:16px;font-weight:bold;">કુલ ચુકવણી / Total Payments:</td>
-                  <td style="padding:15px;text-align:right;border:1px solid #7c3aed;font-size:16px;font-weight:bold;">${formatCurrency(data.advance_paid + data.total_payments)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ` : (data.advance_paid > 0 ? `
-        <div style="margin-bottom:30px;">
-          <div style="border:2px solid #7c3aed;border-radius:8px;overflow:hidden;">
-            <div style="background:#7c3aed;color:white;padding:15px;text-align:center;">
-              <h3 style="margin:0;font-size:20px;font-weight:bold;">ચુકવણી / PAYMENTS</h3>
-            </div>
-            
-            <table style="width:100%;border-collapse:collapse;font-size:16px;">
-              <tbody>
-                <tr style="background:#f3e8ff;">
-                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">અગાઉથી ચૂકવેલ / Advance Paid:</td>
-                  <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#7c3aed;">${formatCurrency(data.advance_paid)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ` : '')}
-
-      <!-- Final Calculation -->
-      <div style="margin-bottom:30px;">
-        <div style="border:3px solid #${data.final_due > 0 ? 'dc2626' : '059669'};border-radius:8px;overflow:hidden;">
-          <div style="background:#${data.final_due > 0 ? 'dc2626' : '059669'};color:white;padding:20px;text-align:center;">
-            <h3 style="margin:0;font-size:24px;font-weight:bold;">અંતિમ ગણતરી / FINAL CALCULATION</h3>
-          </div>
-          
-          <table style="width:100%;border-collapse:collapse;font-size:18px;">
-            <tbody>
-              <tr style="background:#f8fafc;">
-                <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">મૂળ કુલ / Core Total:</td>
-                <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;">${formatCurrency(data.core_total)}</td>
+              <!-- Grand Total Row -->
+              <tr style="background:#1e40af;color:white;border-top:3px solid #1e40af;">
+                <td style="padding:20px;border:1px solid #1e40af;font-size:20px;font-weight:bold;">કુલ રકમ / Grand Total:</td>
+                <td style="padding:20px;text-align:right;border:1px solid #1e40af;font-size:22px;font-weight:bold;">${formatCurrency(data.total_rent + data.worker_charge + data.lost_plate_penalty)}</td>
               </tr>
               
-              ${data.extra_charges_total > 0 ? `
-                <tr style="background:#fef3c7;">
-                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">વધારાના ચાર્જ / Extra Charges:</td>
-                  <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#dc2626;">+${formatCurrency(data.extra_charges_total)}</td>
-                </tr>
-              ` : ''}
-              
-              ${data.discounts_total > 0 ? `
+              ${data.advance_paid > 0 ? `
                 <tr style="background:#dcfce7;">
-                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">ડિસ્કાઉન્ટ / Discounts:</td>
-                  <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#059669;">-${formatCurrency(data.discounts_total)}</td>
-                </tr>
-              ` : ''}
-              
-              <tr style="background:#e0e7ff;border-top:2px solid #1e40af;">
-                <td style="padding:15px;border:1px solid #e2e8f0;font-size:18px;font-weight:bold;">ગોઠવેલ કુલ / Adjusted Total:</td>
-                <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-size:18px;font-weight:bold;">${formatCurrency(data.adjusted_total)}</td>
-              </tr>
-              
-              ${(data.advance_paid + data.total_payments) > 0 ? `
-                <tr style="background:#f3e8ff;">
-                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">કુલ ચૂકવણી / Total Payments:</td>
-                  <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#7c3aed;">-${formatCurrency(data.advance_paid + data.total_payments)}</td>
+                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;color:#059669;">અગાઉથી ચૂકવેલ / Advance Paid:</td>
+                  <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#059669;">-${formatCurrency(data.advance_paid)}</td>
                 </tr>
               ` : ''}
               
               <!-- Final Due Row -->
-              <tr style="background:#${data.final_due > 0 ? 'dc2626' : '059669'};color:white;border-top:3px solid #${data.final_due > 0 ? 'dc2626' : '059669'};">
-                <td style="padding:25px;border:1px solid #${data.final_due > 0 ? 'dc2626' : '059669'};font-size:24px;font-weight:bold;">
-                  ${data.final_due > 0 ? 'અંતિમ બાકી / FINAL DUE:' : 'સંપૂર્ણ ચૂકવણી / FULLY PAID:'}
+              <tr style="background:#${(data.total_rent + data.worker_charge + data.lost_plate_penalty - data.advance_paid) > 0 ? 'dc2626' : '059669'};color:white;border-top:3px solid #${(data.total_rent + data.worker_charge + data.lost_plate_penalty - data.advance_paid) > 0 ? 'dc2626' : '059669'};">
+                <td style="padding:25px;border:1px solid #${(data.total_rent + data.worker_charge + data.lost_plate_penalty - data.advance_paid) > 0 ? 'dc2626' : '059669'};font-size:24px;font-weight:bold;">
+                  ${(data.total_rent + data.worker_charge + data.lost_plate_penalty - data.advance_paid) > 0 ? 'અંતિમ બાકી / FINAL DUE:' : 'સંપૂર્ણ ચૂકવણી / FULLY PAID:'}
                 </td>
-                <td style="padding:25px;text-align:right;border:1px solid #${data.final_due > 0 ? 'dc2626' : '059669'};font-size:28px;font-weight:bold;">
-                  ${data.final_due > 0 ? formatCurrency(data.final_due) : '₹0.00'}
+                <td style="padding:25px;text-align:right;border:1px solid #${(data.total_rent + data.worker_charge + data.lost_plate_penalty - data.advance_paid) > 0 ? 'dc2626' : '059669'};font-size:28px;font-weight:bold;">
+                  ${(data.total_rent + data.worker_charge + data.lost_plate_penalty - data.advance_paid) > 0 ? formatCurrency(data.total_rent + data.worker_charge + data.lost_plate_penalty - data.advance_paid) : '₹0.00'}
                 </td>
               </tr>
             </tbody>
@@ -306,8 +160,7 @@ export const generateEnhancedGujaratiBillJPG = async (data: EnhancedGujaratiBill
           <li>ઉધાર (Udhar): Same day effective / તે જ દિવસે અસરકારક</li>
           <li>જમા (Jama): Next day effective / આગલા દિવસે અસરકારક</li>
           <li>Rate: ₹${data.rates.daily_rent_rate}/plate/day</li>
-          <li>First issue date = Day 1 / પ્રથમ ઉધાર તારીખ = દિવસ 1</li>
-          <li>Final Due = (Core + Extra - Discounts) - (Advance + Payments)</li>
+          <li>Final Due = (Rent + Worker + Lost Plates) - Advance Paid</li>
         </ul>
       </div>
 

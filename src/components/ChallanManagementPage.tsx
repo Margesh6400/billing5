@@ -1,895 +1,389 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
-import { Database } from '../lib/supabase';
+import React, { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
+import { Database } from '../lib/supabase'
 import { 
-  Download, 
-  Eye, 
-  Search, 
-  User, 
-  Hash, 
   FileText, 
-  Edit, 
-  Save, 
-  X, 
+  RotateCcw, 
+  Search, 
+  Download, 
+  Calendar, 
+  User, 
+  Package, 
   Trash2, 
-  BookOpen, 
-  Lock,
-  ArrowLeft,
-  Package,
+  Edit3,
+  Eye,
+  Filter,
+  X,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  Hash,
   MapPin,
-  Phone,
-  Loader2,
-  AlertTriangle
-} from 'lucide-react';
-import { format } from 'date-fns';
-import { motion, AnimatePresence } from 'framer-motion';
-import { generateJPGChallan, downloadJPGChallan } from '../utils/jpgChallanGenerator';
-import { PrintableChallan } from './challans/PrintableChallan';
-import { ChallanData } from './challans/types';
-import { useAuth } from '../hooks/useAuth';
+  Phone
+} from 'lucide-react'
+import { PrintableChallan } from './challans/PrintableChallan'
+import { generateJPGChallan, downloadJPGChallan } from '../utils/jpgChallanGenerator'
+import { ChallanData } from './challans/types'
+import { useAuth } from '../hooks/useAuth'
 
-const PLATE_SIZES = [
-  '2 X 3', '21 X 3', '18 X 3', '15 X 3', '12 X 3',
-  '9 X 3', 'પતરા', '2 X 2', '2 ફુટ'
-];
+type Client = Database['public']['Tables']['clients']['Row']
+type Challan = Database['public']['Tables']['challans']['Row']
+type ChallanItem = Database['public']['Tables']['challan_items']['Row']
+type Return = Database['public']['Tables']['returns']['Row']
+type ReturnLineItem = Database['public']['Tables']['return_line_items']['Row']
 
-type Client = Database['public']['Tables']['clients']['Row'];
-type Stock = Database['public']['Tables']['stock']['Row'];
-
-interface ChallanItem {
-  id: number;
-  challan_id: number;
-  plate_size: string;
-  borrowed_quantity: number;
-  partner_stock_notes?: string | null;
-  status: string;
-  borrowed_stock: number;
+interface ChallanWithItems extends Challan {
+  challan_items: ChallanItem[]
+  client: Client
 }
 
-interface ReturnLineItem {
-  id: number;
-  return_id: number;
-  plate_size: string;
-  returned_quantity: number;
-  damage_notes?: string | null;
-  damaged_quantity: number;
-  lost_quantity: number;
-  returned_borrowed_stock: number;
+interface ReturnWithItems extends Return {
+  return_line_items: ReturnLineItem[]
+  client: Client
 }
 
-interface UdharChallan {
-  id: number;
-  challan_number: string;
-  challan_date: string;
-  status: 'active' | 'completed' | 'partial';
-  client: Client;
-  challan_items: ChallanItem[];
-  total_plates: number;
-  driver_name?: string | null;
-}
-
-interface JamaChallan {
-  id: number;
-  return_challan_number: string;
-  return_date: string;
-  client: Client;
-  return_line_items: ReturnLineItem[];
-  total_plates: number;
-  driver_name?: string | null;
-}
-
-interface ClientLedger {
-  client: Client;
-  udhar_challans: UdharChallan[];
-  jama_challans: JamaChallan[];
-  total_outstanding: number;
-  has_activity: boolean;
-  all_transactions: Array<{
-    type: 'udhar' | 'jama';
-    id: number;
-    number: string;
-    date: string;
-    client_id: string;
-    items: Array<{
-      plate_size: string;
-      quantity: number;
-      borrowed_stock?: number;
-      returned_borrowed_stock?: number;
-      notes?: string;
-    }>;
-    driver_name?: string;
-  }>;
-}
-
-// COMPLETELY NEW APPROACH - Simple Edit State
-interface EditState {
-  isOpen: boolean;
-  transactionId: number | null;
-  transactionType: 'udhar' | 'jama' | null;
-  challanNumber: string;
-  date: string;
-  clientId: string;
-  driverName: string;
-  plateData: Record<string, { quantity: number; borrowedStock: number; notes: string }>;
-}
-
-interface StockValidation {
-  size: string;
-  requested: number;
-  available: number;
-}
+type FilterStatus = 'all' | 'active' | 'completed'
+type SortBy = 'date_desc' | 'date_asc' | 'client_name' | 'challan_number'
 
 export function ChallanManagementPage() {
-  const { user } = useAuth();
-  const [clients, setClients] = useState<Client[]>([]);
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [clientLedger, setClientLedger] = useState<ClientLedger | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [expandedClient, setExpandedClient] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState<number | null>(null);
-  const [challanData, setChallanData] = useState<ChallanData | null>(null);
-  const [stockData, setStockData] = useState<Stock[]>([]);
-  const [stockValidation, setStockValidation] = useState<StockValidation[]>([]);
-  const [previousDrivers, setPreviousDrivers] = useState<string[]>([]);
-
-  // NEW SIMPLE EDIT STATE
-  const [editState, setEditState] = useState<EditState>({
-    isOpen: false,
-    transactionId: null,
-    transactionType: null,
-    challanNumber: '',
-    date: '',
-    clientId: '',
-    driverName: '',
-    plateData: {}
-  });
-  const [editLoading, setEditLoading] = useState(false);
+  const { user } = useAuth()
+  const [udharChallans, setUdharChallans] = useState<ChallanWithItems[]>([])
+  const [jamaChallans, setJamaChallans] = useState<ReturnWithItems[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [downloading, setDownloading] = useState<string | null>(null)
+  const [challanData, setChallanData] = useState<ChallanData | null>(null)
+  const [activeTab, setActiveTab] = useState<'udhar' | 'jama'>('udhar')
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
+  const [sortBy, setSortBy] = useState<SortBy>('date_desc')
+  const [expandedChallan, setExpandedChallan] = useState<string | null>(null)
+  const [showFilters, setShowFilters] = useState(false)
 
   useEffect(() => {
-    console.log('Initial useEffect running');
-    const loadData = async () => {
-      console.log('Starting data fetch');
-      await Promise.all([
-        fetchClients(),
-        fetchStockData(),
-        fetchPreviousDriverNames()
-      ]);
-      console.log('Data fetch complete');
-    };
-    loadData();
-  }, []);
-
-  const fetchStockData = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('stock')
-        .select('*')
-        .order('plate_size');
-
-      if (error) throw error;
-      setStockData(data || []);
-    } catch (error) {
-      console.error('Error fetching stock data:', error);
-    }
-  };
-
-  const fetchPreviousDriverNames = async () => {
-    try {
-      const [{ data: challanDrivers }, { data: returnDrivers }] = await Promise.all([
-        supabase
-          .from('challans')
-          .select('driver_name')
-          .not('driver_name', 'is', null)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('returns')
-          .select('driver_name')
-          .not('driver_name', 'is', null)
-          .order('return_date', { ascending: false })
-      ]);
-
-      if (challanDrivers || returnDrivers) {
-        const allDrivers = [...(challanDrivers || []), ...(returnDrivers || [])]
-          .map(record => record.driver_name)
-          .filter((name): name is string => name !== null && name.trim() !== '');
-        
-        const uniqueDrivers = [...new Set(allDrivers)];
-        setPreviousDrivers(uniqueDrivers);
-      }
-    } catch (error) {
-      console.error('Error fetching previous driver names:', error);
-    }
-  };
-
-  const fetchClients = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .order('name');
-
-      if (error) throw error;
-      setClients(data || []);
-    } catch (error) {
-      console.error('Error fetching clients:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchClientLedger = async (client: Client) => {
-    try {
-      setLoading(true);
-      
-      const [challansResponse, returnsResponse] = await Promise.all([
-        supabase
-          .from('challans')
-          .select(`*, challan_items (*)`)
-          .eq('client_id', client.id)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('returns')
-          .select(`*, return_line_items (*)`)
-          .eq('client_id', client.id)
-          .order('created_at', { ascending: false })
-      ]);
-
-      if (challansResponse.error) throw challansResponse.error;
-      if (returnsResponse.error) throw returnsResponse.error;
-
-      const { data: challans } = challansResponse;
-      const { data: returns } = returnsResponse;
-
-      const transformedUdharData = challans?.map(challan => ({
-        id: challan.id,
-        challan_number: challan.challan_number,
-        challan_date: challan.challan_date,
-        status: challan.status as 'active' | 'completed' | 'partial',
-        client: client,
-        challan_items: challan.challan_items as ChallanItem[],
-        total_plates: challan.challan_items?.reduce(
-          (sum: number, item: ChallanItem) => sum + (item.borrowed_quantity || 0) + (item.borrowed_stock || 0), 
-          0
-        ),
-        driver_name: challan.driver_name
-      })) || [];
-
-      const transformedJamaData = returns?.map(returnRecord => ({
-        id: returnRecord.id,
-        return_challan_number: returnRecord.return_challan_number,
-        return_date: returnRecord.return_date,
-        client: client,
-        return_line_items: returnRecord.return_line_items as ReturnLineItem[],
-        total_plates: returnRecord.return_line_items?.reduce(
-          (sum: number, item: ReturnLineItem) => sum + (item.returned_quantity || 0) + (item.returned_borrowed_stock || 0), 
-          0
-        ),
-        driver_name: returnRecord.driver_name
-      })) || [];
-
-      // Totals for outstanding should consider own quantities only (borrowed/returned)
-      const totalBorrowed = transformedUdharData.reduce((sum, challan) => 
-        sum + challan.challan_items.reduce((itemSum, item) => 
-          itemSum + (item.borrowed_quantity || 0), 0), 0);
-      const totalReturned = transformedJamaData.reduce((sum, returnRecord) => 
-        sum + returnRecord.return_line_items.reduce((itemSum, item) => 
-          itemSum + (item.returned_quantity || 0), 0), 0);
-      const total_outstanding = totalBorrowed - totalReturned;
-
-      const allTransactions = [
-        ...transformedUdharData.map(challan => ({
-          type: 'udhar' as const,
-          id: challan.id,
-          number: challan.challan_number,
-          date: challan.challan_date,
-          client_id: challan.client.id,
-          items: challan.challan_items.map(item => ({
-            plate_size: item.plate_size,
-            quantity: item.borrowed_quantity,
-            borrowed_stock: item.borrowed_stock || 0,
-            notes: item.partner_stock_notes || ''
-          })),
-          driver_name: challan.driver_name
-        })),
-        ...transformedJamaData.map(returnRecord => ({
-          type: 'jama' as const,
-          id: returnRecord.id,
-          number: returnRecord.return_challan_number,
-          date: returnRecord.return_date,
-          client_id: returnRecord.client.id,
-          items: returnRecord.return_line_items.map(item => ({
-            plate_size: item.plate_size,
-            quantity: item.returned_quantity,
-            returned_borrowed_stock: item.returned_borrowed_stock || 0,
-            notes: item.damage_notes || ''
-          })),
-          driver_name: returnRecord.driver_name
-        }))
-      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      setClientLedger({
-        client,
-        udhar_challans: transformedUdharData,
-        jama_challans: transformedJamaData,
-        total_outstanding,
-        has_activity: transformedUdharData.length > 0 || transformedJamaData.length > 0,
-        all_transactions: allTransactions
-      });
-    } catch (error) {
-      console.error('Error fetching client ledger:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleClientSelect = (client: Client) => {
-    setSelectedClient(client);
-    setExpandedClient(null);
-    closeEditModal();
-    fetchClientLedger(client);
-  };
-
-  // COMPLETELY NEW APPROACH - Simple Functions
-  const openEditModal = async (transactionId: number, transactionType: 'udhar' | 'jama') => {
-    console.log('🚀 Opening edit modal:', { transactionId, transactionType });
+    fetchChallans()
     
+    // Set up real-time subscriptions
+    const challanSubscription = supabase
+      .channel('challans_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'challans' }, () => {
+        fetchChallans()
+      })
+      .subscribe()
+
+    const returnsSubscription = supabase
+      .channel('returns_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'returns' }, () => {
+        fetchChallans()
+      })
+      .subscribe()
+
+    return () => {
+      challanSubscription.unsubscribe()
+      returnsSubscription.unsubscribe()
+    }
+  }, [])
+
+  const fetchChallans = async () => {
+    try {
+      // Fetch udhar challans
+      const { data: udharData, error: udharError } = await supabase
+        .from('challans')
+        .select(`
+          *,
+          challan_items (*),
+          client:clients (*)
+        `)
+        .order('created_at', { ascending: false })
+
+      if (udharError) throw udharError
+
+      // Fetch jama challans
+      const { data: jamaData, error: jamaError } = await supabase
+        .from('returns')
+        .select(`
+          *,
+          return_line_items (*),
+          client:clients (*)
+        `)
+        .order('created_at', { ascending: false })
+
+      if (jamaError) throw jamaError
+
+      setUdharChallans(udharData || [])
+      setJamaChallans(jamaData || [])
+    } catch (error) {
+      console.error('Error fetching challans:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteUdharChallan = async (challanId: number) => {
     if (!user?.isAdmin) {
-      alert('આ કામગીરી માટે એડમિન અધિકાર જરૂરી છે.');
-      return;
+      alert('Only admin can delete challans.')
+      return
+    }
+
+    if (!confirm('Are you sure you want to delete this udhar challan? This will also update stock quantities.')) {
+      return
     }
 
     try {
-      let data: any;
-      let error: any;
+      // First, get the challan items to revert stock
+      const { data: challanItems, error: itemsError } = await supabase
+        .from('challan_items')
+        .select('*')
+        .eq('challan_id', challanId)
 
-      if (transactionType === 'udhar') {
-        const response = await supabase
-          .from('challans')
-          .select('*, challan_items(*)')
-          .eq('id', transactionId)
-          .single();
-        data = response.data;
-        error = response.error;
-      } else {
-        const response = await supabase
-          .from('returns')
-          .select('*, return_line_items(*)')
-          .eq('id', transactionId)
-          .single();
-        data = response.data;
-        error = response.error;
-      }
+      if (itemsError) throw itemsError
 
-      if (error) throw error;
+      // Revert stock quantities for each item
+      for (const item of challanItems || []) {
+        const { data: stockItem, error: stockFetchError } = await supabase
+          .from('stock')
+          .select('*')
+          .eq('plate_size', item.plate_size)
+          .single()
 
-      // Initialize plate data
-      const plateData: Record<string, { quantity: number; borrowedStock: number; notes: string }> = {};
-      PLATE_SIZES.forEach(size => {
-        plateData[size] = { quantity: 0, borrowedStock: 0, notes: '' };
-      });
-
-      // Fill with actual data
-      if (transactionType === 'udhar') {
-        (data.challan_items as ChallanItem[]).forEach(item => {
-          plateData[item.plate_size] = {
-            quantity: item.borrowed_quantity,
-            borrowedStock: item.borrowed_stock || 0,
-            notes: item.partner_stock_notes || ''
-          };
-        });
-      } else {
-        (data.return_line_items as ReturnLineItem[]).forEach(item => {
-          plateData[item.plate_size] = {
-            quantity: item.returned_quantity,
-            borrowedStock: item.returned_borrowed_stock || 0,
-            notes: item.damage_notes || ''
-          };
-        });
-      }
-
-      setEditState({
-        isOpen: true,
-        transactionId,
-        transactionType,
-        challanNumber: transactionType === 'udhar' ? data.challan_number : data.return_challan_number,
-        date: transactionType === 'udhar' ? data.challan_date : data.return_date,
-        clientId: data.client_id,
-        driverName: data.driver_name || '',
-        plateData
-      });
-
-      console.log('✅ Edit modal opened successfully');
-
-    } catch (error) {
-      console.error('❌ Error opening edit modal:', error);
-      alert('ચલણ વિગતો લોડ કરવામાં ભૂલ.');
-    }
-  };
-
-  const closeEditModal = () => {
-    setEditState({
-      isOpen: false,
-      transactionId: null,
-      transactionType: null,
-      challanNumber: '',
-      date: '',
-      clientId: '',
-      driverName: '',
-      plateData: {}
-    });
-    setStockValidation([]);
-  };
-
-  const updateEditField = (field: keyof EditState, value: any) => {
-    setEditState(prev => ({ ...prev, [field]: value }));
-  };
-
-  const updatePlateData = (size: string, field: 'quantity' | 'borrowedStock' | 'notes', value: any) => {
-    setEditState(prev => ({
-      ...prev,
-      plateData: {
-        ...prev.plateData,
-        [size]: {
-          ...prev.plateData[size],
-          [field]: value
-        }
-      }
-    }));
-  };
-
-  const validateStockAvailability = useCallback(() => {
-    if (!editState.isOpen || editState.transactionType !== 'udhar') return;
-    
-    const insufficientStock: StockValidation[] = [];
-    Object.entries(editState.plateData).forEach(([size, data]) => {
-      if (data.quantity > 0) {
-        const stock = stockData.find(s => s.plate_size === size);
-        if (stock && data.quantity > stock.available_quantity) {
-          insufficientStock.push({
-            size,
-            requested: data.quantity,
-            available: stock.available_quantity
-          });
-        }
-      }
-    });
-    setStockValidation(insufficientStock);
-  }, [editState, stockData]);
-
-  useEffect(() => {
-    validateStockAvailability();
-  }, [validateStockAvailability]);
-
-  const handleSaveEdit = async () => {
-    if (!editState.isOpen || !editState.transactionId) return;
-
-    setEditLoading(true);
-    try {
-      const id = editState.transactionId;
-
-      // Compute deltas and update stock accordingly
-      if (editState.transactionType === 'udhar') {
-        // fetch old challan items
-        const { data: oldItems, error: oldErr } = await supabase
-          .from('challan_items')
-          .select('plate_size, borrowed_quantity, borrowed_stock')
-          .eq('challan_id', id);
-        if (oldErr) throw oldErr;
-
-        // Calculate old totals (only own borrowed_quantity for stock calculations)
-        const oldTotals: Record<string, number> = {};
-        (oldItems || []).forEach((it: any) => {
-          oldTotals[it.plate_size] = (oldTotals[it.plate_size] || 0) + (it.borrowed_quantity || 0);
-        });
-
-        // Calculate new totals (only own quantity for stock calculations)
-        const newTotals: Record<string, number> = {};
-        Object.entries(editState.plateData).forEach(([plate, v]) => {
-          const qty = (v.quantity || 0); // only own quantity
-          if (qty > 0) newTotals[plate] = qty;
-        });
-
-        // Calculate deltas (old - new) as per the requirement
-        const plates = Array.from(new Set([...Object.keys(oldTotals), ...Object.keys(newTotals)]));
-        const deltas: Record<string, number> = {};
-        plates.forEach(p => {
-          const delta = (oldTotals[p] || 0) - (newTotals[p] || 0); // old - new
-          if (delta !== 0) deltas[p] = delta;
-        });
-
-        // If none of the own-quantities changed (old == new for all plates), skip updating main stock
-        const hasOwnQuantityChange = plates.some(p => (oldTotals[p] || 0) !== (newTotals[p] || 0));
-        if (!hasOwnQuantityChange) {
-          console.debug('[Challan Edit][UDHAR] no own-quantity change detected, skipping main stock updates', { oldTotals, newTotals });
-        } else {
-          const { data: stocks, error: stockErr } = await supabase
-            .from('stock')
-            .select('id, plate_size, available_quantity')
-            .in('plate_size', Object.keys(deltas));
-          if (stockErr) throw stockErr;
-
-          const applied: Array<{ id: number; previous: number }> = [];
-          try {
-            for (const s of (stocks || [])) {
-              const delta = deltas[s.plate_size] || 0;
-              if (delta === 0) continue;
-
-              const beforeAvailable = s.available_quantity || 0;
-              // If delta > 0: old > new, so add back to stock (delta amount was reduced, now return it)
-              // If delta < 0: old < new, so reduce from stock (more is being issued)
-              const newAvailable = delta > 0
-                ? beforeAvailable + delta // add back to stock
-                : Math.max(0, beforeAvailable + delta); // reduce from stock (delta is negative)
-
-              // debug log to trace incorrect stock adjustments
-              console.debug('[Challan Edit][UDHAR] plate=%s id=%s delta=%d beforeAvailable=%d newAvailable=%d oldTotals=%o newTotals=%o', s.plate_size, s.id, delta, beforeAvailable, newAvailable, oldTotals, newTotals);
-
-              const { error: updErr } = await supabase
-                .from('stock')
-                .update({ available_quantity: newAvailable })
-                .eq('id', s.id);
-              if (updErr) throw updErr;
-              applied.push({ id: s.id, previous: s.available_quantity || 0 });
-            }
-          } catch (uErr) {
-            // Revert on error
-            for (const a of applied) {
-              try {
-                await supabase.from('stock').update({ available_quantity: a.previous }).eq('id', a.id);
-              } catch (e) {
-                console.error('revert failed', e);
-              }
-            }
-            throw uErr;
-          }
+        if (stockFetchError) {
+          console.error('Error fetching stock for', item.plate_size, stockFetchError)
+          continue
         }
 
-        // update header then replace items
-        const { error: challanError } = await supabase
-          .from('challans')
+        // Revert stock: add back to available, subtract from on_rent
+        const newAvailableQuantity = stockItem.available_quantity + item.borrowed_quantity
+        const newOnRentQuantity = Math.max(0, stockItem.on_rent_quantity - item.borrowed_quantity)
+
+        const { error: stockUpdateError } = await supabase
+          .from('stock')
           .update({
-            challan_number: editState.challanNumber,
-            challan_date: editState.date,
-            client_id: editState.clientId,
-            driver_name: editState.driverName || null
+            available_quantity: newAvailableQuantity,
+            on_rent_quantity: newOnRentQuantity,
+            updated_at: new Date().toISOString()
           })
-          .eq('id', id);
-        if (challanError) throw challanError;
+          .eq('id', stockItem.id)
 
-        const { error: deleteError } = await supabase
-          .from('challan_items')
-          .delete()
-          .eq('challan_id', id);
-        if (deleteError) throw deleteError;
-
-        const newItems = Object.entries(editState.plateData)
-          .filter(([_, v]) => (v.quantity || 0) > 0 || (v.borrowedStock || 0) > 0)
-          .map(([plate_size, v]) => ({
-            challan_id: id,
-            plate_size,
-            borrowed_quantity: v.quantity || 0,
-            borrowed_stock: v.borrowedStock || 0,
-            partner_stock_notes: (v.notes || '').trim() || null
-          }));
-
-        if (newItems.length > 0) {
-          const { error: insertError } = await supabase
-            .from('challan_items')
-            .insert(newItems);
-          if (insertError) throw insertError;
+        if (stockUpdateError) {
+          console.error('Error updating stock for', item.plate_size, stockUpdateError)
         }
-      } else {
-        // jama (returns) logic remains the same
-        const { data: oldItems, error: oldErr } = await supabase
-          .from('return_line_items')
-          .select('plate_size, returned_quantity, returned_borrowed_stock')
-          .eq('return_id', id);
-        if (oldErr) throw oldErr;
+      }
 
-        // For returns, compute deltas only based on returned_quantity (own stock)
-        const oldTotals: Record<string, number> = {};
-        (oldItems || []).forEach((it: any) => {
-          oldTotals[it.plate_size] = (oldTotals[it.plate_size] || 0) + (it.returned_quantity || 0);
-        });
+      // Delete the challan (cascade will delete items)
+      const { error: deleteError } = await supabase
+        .from('challans')
+        .delete()
+        .eq('id', challanId)
 
-        const newTotals: Record<string, number> = {};
-        Object.entries(editState.plateData).forEach(([plate, v]) => {
-          const qty = (v.quantity || 0);
-          if (qty > 0) newTotals[plate] = qty;
-        });
+      if (deleteError) throw deleteError
 
-        const plates = Array.from(new Set([...Object.keys(oldTotals), ...Object.keys(newTotals)]));
-        const deltas: Record<string, number> = {};
-        plates.forEach(p => {
-          const d = (newTotals[p] || 0) - (oldTotals[p] || 0); // positive => more returned => increase available
-          if (d !== 0) deltas[p] = d;
-        });
+      alert('Udhar challan deleted successfully and stock updated!')
+      await fetchChallans()
+    } catch (error) {
+      console.error('Error deleting udhar challan:', error)
+      alert('Error deleting challan. Please try again.')
+    }
+  }
 
-        // For returns, if returned own quantities didn't change, skip main stock updates
-        const hasOwnReturnChange = plates.some(p => (newTotals[p] || 0) !== (oldTotals[p] || 0));
-        if (!hasOwnReturnChange) {
-          console.debug('[Challan Edit][JAMA] no own-return change detected, skipping main stock updates', { oldTotals, newTotals });
-        } else {
-          const { data: stocks, error: stockErr } = await supabase
-            .from('stock')
-            .select('id, plate_size, available_quantity')
-            .in('plate_size', Object.keys(deltas));
-          if (stockErr) throw stockErr;
+  const handleDeleteJamaChallan = async (returnId: number) => {
+    if (!user?.isAdmin) {
+      alert('Only admin can delete challans.')
+      return
+    }
 
-          const applied: Array<{ id: number; previous: number }> = [];
-          try {
-            for (const s of (stocks || [])) {
-              const delta = deltas[s.plate_size] || 0;
-              if (delta === 0) continue;
-              const beforeAvailable = s.available_quantity || 0;
-              const newAvailable = Math.max(0, beforeAvailable + delta);
-              console.debug('[Challan Edit][JAMA] plate=%s id=%s delta=%d beforeAvailable=%d newAvailable=%d', s.plate_size, s.id, delta, beforeAvailable, newAvailable);
-              const { error: updErr } = await supabase
-                .from('stock')
-                .update({ available_quantity: newAvailable })
-                .eq('id', s.id);
-              if (updErr) throw updErr;
-              applied.push({ id: s.id, previous: s.available_quantity || 0 });
-            }
-          } catch (uErr) {
-            for (const a of applied) {
-              try { await supabase.from('stock').update({ available_quantity: a.previous }).eq('id', a.id); } catch (e) { console.error('revert failed', e); }
-            }
-            throw uErr;
-          }
+    if (!confirm('Are you sure you want to delete this jama challan? This will also update stock quantities.')) {
+      return
+    }
+
+    try {
+      // First, get the return line items to revert stock
+      const { data: returnItems, error: itemsError } = await supabase
+        .from('return_line_items')
+        .select('*')
+        .eq('return_id', returnId)
+
+      if (itemsError) throw itemsError
+
+      // Revert stock quantities for each item
+      for (const item of returnItems || []) {
+        const { data: stockItem, error: stockFetchError } = await supabase
+          .from('stock')
+          .select('*')
+          .eq('plate_size', item.plate_size)
+          .single()
+
+        if (stockFetchError) {
+          console.error('Error fetching stock for', item.plate_size, stockFetchError)
+          continue
         }
 
-        const { error: returnError } = await supabase
-          .from('returns')
+        // Revert stock: subtract from available, add back to on_rent
+        const damagedQty = item.damaged_quantity || 0
+        const lostQty = item.lost_quantity || 0
+        const goodReturnedQty = item.returned_quantity - damagedQty - lostQty
+
+        const newAvailableQuantity = Math.max(0, stockItem.available_quantity - goodReturnedQty)
+        const newOnRentQuantity = stockItem.on_rent_quantity + item.returned_quantity
+
+        const { error: stockUpdateError } = await supabase
+          .from('stock')
           .update({
-            return_challan_number: editState.challanNumber,
-            return_date: editState.date,
-            client_id: editState.clientId,
-            driver_name: editState.driverName || null
+            available_quantity: newAvailableQuantity,
+            on_rent_quantity: newOnRentQuantity,
+            updated_at: new Date().toISOString()
           })
-          .eq('id', id);
-        if (returnError) throw returnError;
+          .eq('id', stockItem.id)
 
-        const { error: deleteError } = await supabase
-          .from('return_line_items')
-          .delete()
-          .eq('return_id', id);
-        if (deleteError) throw deleteError;
-
-        const newItems = Object.entries(editState.plateData)
-          .filter(([_, v]) => (v.quantity || 0) > 0 || (v.borrowedStock || 0) > 0)
-          .map(([plate_size, v]) => ({
-            return_id: id,
-            plate_size,
-            returned_quantity: v.quantity || 0,
-            returned_borrowed_stock: v.borrowedStock || 0,
-            damage_notes: (v.notes || '').trim() || null
-          }));
-
-        if (newItems.length > 0) {
-          const { error: insertError } = await supabase
-            .from('return_line_items')
-            .insert(newItems);
-          if (insertError) throw insertError;
+        if (stockUpdateError) {
+          console.error('Error updating stock for', item.plate_size, stockUpdateError)
         }
       }
 
-      closeEditModal();
-      if (selectedClient) await fetchClientLedger(selectedClient);
-      alert('ચલણ સફળતાપૂર્વક અપડેટ થયું!');
+      // Delete the return (cascade will delete items)
+      const { error: deleteError } = await supabase
+        .from('returns')
+        .delete()
+        .eq('id', returnId)
+
+      if (deleteError) throw deleteError
+
+      alert('Jama challan deleted successfully and stock updated!')
+      await fetchChallans()
     } catch (error) {
-      console.error('Error updating challan:', error);
-      alert('ચલણ અપડેટ કરવામાં ભૂલ. કૃપા કરીને ફરી પ્રયત્ન કરો.');
-    } finally {
-      setEditLoading(false);
+      console.error('Error deleting jama challan:', error)
+      alert('Error deleting challan. Please try again.')
     }
-  };
+  }
 
-  const handleDeleteChallan = async () => {
-    if (!editState.isOpen || !editState.transactionId) return;
-
-    const confirmDelete = confirm(`શું તમે ખરેખર આ ${editState.transactionType} ચલણ ડિલીટ કરવા માંગો છો? આ ક્રિયા પૂર્વવત્ કરી શકાશે નહીં.`);
-    if (!confirmDelete) return;
-
-    setEditLoading(true);
+  const handleDownloadChallan = async (challan: ChallanWithItems | ReturnWithItems, type: 'udhar' | 'jama') => {
     try {
-      const id = editState.transactionId;
-      if (editState.transactionType === 'udhar') {
-        // read items and restore to stock
-        const { data: items, error: itemsErr } = await supabase
-          .from('challan_items')
-          .select('plate_size, borrowed_quantity, borrowed_stock')
-          .eq('challan_id', id);
-        if (itemsErr) throw itemsErr;
+      const downloadKey = `${type}-${challan.id}`
+      setDownloading(downloadKey)
 
-        // Only restore own borrowed quantities to stock (ignore borrowed_stock here)
-        const deltas: Record<string, number> = {};
-        (items || []).forEach((it: any) => {
-          const qty = (it.borrowed_quantity || 0);
-          if (qty > 0) deltas[it.plate_size] = (deltas[it.plate_size] || 0) + qty;
-        });
-
-        // Only restore own borrowed quantities to stock; if none exist, skip
-        const hasOwnRestore = Object.keys(deltas).some(p => (deltas[p] || 0) !== 0);
-        if (!hasOwnRestore) {
-          console.debug('[Challan Delete][UDHAR] no own borrowed quantities to restore, skipping main stock updates', { deltas });
-        } else {
-          const { data: stocks, error: stockErr } = await supabase
-            .from('stock')
-            .select('id, plate_size, available_quantity')
-            .in('plate_size', Object.keys(deltas));
-          if (stockErr) throw stockErr;
-
-          const applied: Array<{ id: number; previous: number }> = [];
-          try {
-            for (const s of (stocks || [])) {
-              const delta = deltas[s.plate_size] || 0;
-              if (delta === 0) continue;
-                const beforeAvailable = s.available_quantity || 0;
-                const newAvailable = beforeAvailable + delta;
-                console.debug('[Challan Delete][UDHAR] plate=%s id=%s delta=%d beforeAvailable=%d newAvailable=%d', s.plate_size, s.id, delta, beforeAvailable, newAvailable);
-                const { error: updErr } = await supabase
-                  .from('stock')
-                  .update({ available_quantity: newAvailable })
-                  .eq('id', s.id);
-              if (updErr) throw updErr;
-              applied.push({ id: s.id, previous: s.available_quantity || 0 });
-            }
-          } catch (uErr) {
-            for (const a of applied) {
-              try { await supabase.from('stock').update({ available_quantity: a.previous }).eq('id', a.id); } catch (e) { console.error('revert failed', e); }
-            }
-            throw uErr;
-          }
-        }
-
-        const { error: deleteItemsError } = await supabase
-          .from('challan_items')
-          .delete()
-          .eq('challan_id', id);
-        if (deleteItemsError) throw deleteItemsError;
-
-        const { error: deleteHeaderError } = await supabase
-          .from('challans')
-          .delete()
-          .eq('id', id);
-        if (deleteHeaderError) throw deleteHeaderError;
-      } else {
-        // jama: subtract returned amounts from stock
-        const { data: items, error: itemsErr } = await supabase
-          .from('return_line_items')
-          .select('plate_size, returned_quantity, returned_borrowed_stock')
-          .eq('return_id', id);
-        if (itemsErr) throw itemsErr;
-
-        // For jama delete, subtract only the returned_quantity from available stock (borrowed stock handled separately)
-        const deltas: Record<string, number> = {};
-        (items || []).forEach((it: any) => {
-          const qty = (it.returned_quantity || 0);
-          if (qty > 0) deltas[it.plate_size] = (deltas[it.plate_size] || 0) + qty;
-        });
-
-        // For jama delete, if no returned own quantities present, skip main stock subtraction
-        const hasOwnJamaDelete = Object.keys(deltas).some(p => (deltas[p] || 0) !== 0);
-        if (!hasOwnJamaDelete) {
-          console.debug('[Challan Delete][JAMA] no own returned quantities to subtract, skipping main stock updates', { deltas });
-        } else {
-          const { data: stocks, error: stockErr } = await supabase
-            .from('stock')
-            .select('id, plate_size, available_quantity')
-            .in('plate_size', Object.keys(deltas));
-          if (stockErr) throw stockErr;
-
-          const applied: Array<{ id: number; previous: number }> = [];
-          try {
-            for (const s of (stocks || [])) {
-              const delta = deltas[s.plate_size] || 0;
-              if (delta === 0) continue;
-              const beforeAvailable = s.available_quantity || 0;
-              const newAvailable = Math.max(0, beforeAvailable - delta);
-              console.debug('[Challan Delete][JAMA] plate=%s id=%s delta=%d beforeAvailable=%d newAvailable=%d', s.plate_size, s.id, delta, beforeAvailable, newAvailable);
-              const { error: updErr } = await supabase
-                .from('stock')
-                .update({ available_quantity: newAvailable })
-                .eq('id', s.id);
-              if (updErr) throw updErr;
-              applied.push({ id: s.id, previous: s.available_quantity || 0 });
-            }
-          } catch (uErr) {
-            for (const a of applied) {
-              try { await supabase.from('stock').update({ available_quantity: a.previous }).eq('id', a.id); } catch (e) { console.error('revert failed', e); }
-            }
-            throw uErr;
-          }
-        }
-
-        const { error: deleteItemsError } = await supabase
-          .from('return_line_items')
-          .delete()
-          .eq('return_id', id);
-        if (deleteItemsError) throw deleteItemsError;
-
-        const { error: deleteHeaderError } = await supabase
-          .from('returns')
-          .delete()
-          .eq('id', id);
-        if (deleteHeaderError) throw deleteHeaderError;
-      }
-
-      closeEditModal();
-      if (selectedClient) await fetchClientLedger(selectedClient);
-      alert('ચલણ સફળતાપૂર્વક ડિલીટ થયું!');
-    } catch (error) {
-      console.error('Error deleting challan:', error);
-      alert('ચલણ ડિલીટ કરવામાં ભૂલ. કૃપા કરીને ફરી પ્રયત્ન કરો.');
-    } finally {
-      setEditLoading(false);
-    }
-  };
-
-  const handleDownload = async (transaction: any) => {
-    try {
-      setDownloading(transaction.id);
-      
-      const client = selectedClient!;
       const challanDataForPDF: ChallanData = {
-        type: transaction.type === 'udhar' ? 'issue' : 'return',
-        challan_number: transaction.number,
-        date: transaction.date,
+        type: type === 'udhar' ? 'issue' : 'return',
+        challan_number: type === 'udhar' ? (challan as ChallanWithItems).challan_number : (challan as ReturnWithItems).return_challan_number,
+        date: type === 'udhar' ? (challan as ChallanWithItems).challan_date : (challan as ReturnWithItems).return_date,
         client: {
-          id: client.id,
-          name: client.name,
-          site: client.site || '',
-          mobile: client.mobile_number || ''
+          id: challan.client.id,
+          name: challan.client.name,
+          site: challan.client.site || '',
+          mobile: challan.client.mobile_number || ''
         },
-        driver_name: transaction.driver_name || undefined,
-        plates: transaction.items.map((item: any) => ({
-          size: item.plate_size,
-          quantity: item.quantity,
-          borrowed_stock: transaction.type === 'udhar' ? (item.borrowed_stock || 0) : (item.returned_borrowed_stock || 0),
-          notes: item.notes || '',
-        })),
-        total_quantity: transaction.items.reduce((sum: number, item: any) => {
-          const regularQty = item.quantity || 0;
-          const borrowedQty = transaction.type === 'udhar' 
-            ? (item.borrowed_stock || 0) 
-            : (item.returned_borrowed_stock || 0);
-          return sum + regularQty + borrowedQty;
-        }, 0)
-      };
+        driver_name: challan.driver_name || undefined,
+        plates: type === 'udhar' 
+          ? (challan as ChallanWithItems).challan_items.map(item => ({
+              size: item.plate_size,
+              quantity: item.borrowed_quantity,
+              borrowed_stock: item.borrowed_stock || 0,
+              notes: item.partner_stock_notes || '',
+            }))
+          : (challan as ReturnWithItems).return_line_items.map(item => ({
+              size: item.plate_size,
+              quantity: item.returned_quantity,
+              borrowed_stock: item.returned_borrowed_stock || 0,
+              damaged_quantity: item.damaged_quantity || 0,
+              lost_quantity: item.lost_quantity || 0,
+              notes: item.damage_notes || '',
+            })),
+        total_quantity: type === 'udhar'
+          ? (challan as ChallanWithItems).challan_items.reduce((sum, item) => sum + item.borrowed_quantity + (item.borrowed_stock || 0), 0)
+          : (challan as ReturnWithItems).return_line_items.reduce((sum, item) => sum + item.returned_quantity + (item.returned_borrowed_stock || 0), 0)
+      }
 
-      setChallanData(challanDataForPDF);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      setChallanData(challanDataForPDF)
+      await new Promise(resolve => setTimeout(resolve, 500))
 
-      const jpgDataUrl = await generateJPGChallan(challanDataForPDF);
-      downloadJPGChallan(jpgDataUrl, `${transaction.type}-challan-${challanDataForPDF.challan_number}`);
+      const jpgDataUrl = await generateJPGChallan(challanDataForPDF)
+      downloadJPGChallan(jpgDataUrl, `${type}-challan-${challanDataForPDF.challan_number}`)
 
-      setChallanData(null);
+      setChallanData(null)
     } catch (error) {
-      console.error('Error downloading challan:', error);
-      alert('ચલણ ડાઉનલોડ કરવામાં ભૂલ. કૃપા કરીને ફરી પ્રયત્ન કરો.');
+      console.error('Error downloading challan:', error)
+      alert('Error downloading challan. Please try again.')
     } finally {
-      setDownloading(null);
+      setDownloading(null)
     }
-  };
+  }
 
-  const getStockInfo = (size: string) => {
-    return stockData.find(s => s.plate_size === size);
-  };
+  const toggleChallanExpansion = (challanId: string) => {
+    setExpandedChallan(expandedChallan === challanId ? null : challanId)
+  }
 
-  const isStockInsufficient = (size: string) => {
-    return stockValidation.some(item => item.size === size);
-  };
+  // Filter and sort functions
+  const filterChallans = <T extends ChallanWithItems | ReturnWithItems>(challans: T[]): T[] => {
+    return challans.filter(challan => {
+      // Search filter
+      const searchMatch = !searchTerm || (
+        challan.client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        challan.client.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (activeTab === 'udhar' 
+          ? (challan as ChallanWithItems).challan_number.toLowerCase().includes(searchTerm.toLowerCase())
+          : (challan as ReturnWithItems).return_challan_number.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      )
 
-  const filteredClients = clients.filter(client =>
-    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.site.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      if (!searchMatch) return false
+
+      // Status filter (only for udhar)
+      if (activeTab === 'udhar' && filterStatus !== 'all') {
+        const udharChallan = challan as ChallanWithItems
+        if (filterStatus === 'active' && udharChallan.status !== 'active') return false
+        if (filterStatus === 'completed' && udharChallan.status !== 'completed') return false
+      }
+
+      return true
+    })
+  }
+
+  const sortChallans = <T extends ChallanWithItems | ReturnWithItems>(challans: T[]): T[] => {
+    return [...challans].sort((a, b) => {
+      switch (sortBy) {
+        case 'date_desc':
+          const dateA = activeTab === 'udhar' ? (a as ChallanWithItems).challan_date : (a as ReturnWithItems).return_date
+          const dateB = activeTab === 'udhar' ? (b as ChallanWithItems).challan_date : (b as ReturnWithItems).return_date
+          return new Date(dateB).getTime() - new Date(dateA).getTime()
+        case 'date_asc':
+          const dateA2 = activeTab === 'udhar' ? (a as ChallanWithItems).challan_date : (a as ReturnWithItems).return_date
+          const dateB2 = activeTab === 'udhar' ? (b as ChallanWithItems).challan_date : (b as ReturnWithItems).return_date
+          return new Date(dateA2).getTime() - new Date(dateB2).getTime()
+        case 'client_name':
+          return a.client.name.localeCompare(b.client.name)
+        case 'challan_number':
+          const numberA = activeTab === 'udhar' ? (a as ChallanWithItems).challan_number : (a as ReturnWithItems).return_challan_number
+          const numberB = activeTab === 'udhar' ? (b as ChallanWithItems).challan_number : (b as ReturnWithItems).return_challan_number
+          return numberA.localeCompare(numberB)
+        default:
+          return 0
+      }
+    })
+  }
+
+  const filteredAndSortedUdharChallans = sortChallans(filterChallans(udharChallans))
+  const filteredAndSortedJamaChallans = sortChallans(filterChallans(jamaChallans))
+
+  const resetFilters = () => {
+    setSearchTerm('')
+    setFilterStatus('all')
+    setSortBy('date_desc')
+  }
+
+  const hasActiveFilters = searchTerm !== '' || filterStatus !== 'all' || sortBy !== 'date_desc'
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Challan Management</h1>
+          <p className="text-gray-600">Loading challans...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-cyan-50">
+    <div className="space-y-8">
       {/* Hidden Printable Challan */}
       <div style={{ position: 'fixed', left: '-9999px', top: 0 }}>
         {challanData && (
@@ -899,536 +393,503 @@ export function ChallanManagementPage() {
         )}
       </div>
 
-      <div className="p-4 space-y-4">
-        {/* Header */}
-        <div className="text-center">
-          <div className="inline-flex items-center justify-center w-10 h-10 mb-2 rounded-full shadow-lg bg-gradient-to-r from-blue-600 to-indigo-600">
-            <BookOpen className="w-5 h-5 text-white" />
+      {/* Header */}
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Challan Management</h1>
+        <p className="text-gray-600">View and manage all udhar and jama challans</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setActiveTab('udhar')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'udhar'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Udhar Challans ({filteredAndSortedUdharChallans.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('jama')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'jama'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <RotateCcw className="w-4 h-4" />
+              Jama Challans ({filteredAndSortedJamaChallans.length})
+            </button>
           </div>
-          <h1 className="mb-1 text-base font-bold text-gray-900">ચલણ બૂક</h1>
-          <p className="text-xs text-blue-600">ગ્રાહક પસંદ કરો અને ચલણ જુઓ</p>
+
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              showFilters ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <Filter className="w-4 h-4" />
+            Filters
+            {hasActiveFilters && (
+              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+            )}
+          </button>
         </div>
 
-        {/* Client List or Selected Client View */}
-        {!selectedClient ? (
-          <>
-            {/* Search Bar */}
-            <div className="relative">
-              <Search className="absolute w-4 h-4 text-blue-400 -translate-y-1/2 left-3 top-1/2" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="ચલણ નંબર શોઘો..."
-                className="w-full py-3 pl-10 pr-4 text-sm transition-all duration-200 border-2 border-blue-200 rounded-lg focus:ring-4 focus:ring-blue-100 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Client List */}
-            <div className="space-y-3">
-              {loading ? (
-                <div className="space-y-3">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="p-4 bg-white border border-blue-100 shadow-sm rounded-xl animate-pulse">
-                      <div className="w-2/3 h-4 mb-2 bg-blue-200 rounded"></div>
-                      <div className="w-1/2 h-3 bg-blue-200 rounded"></div>
-                    </div>
-                  ))}
-                </div>
-              ) : filteredClients.length === 0 ? (
-                <div className="py-8 text-center bg-white border-2 border-blue-100 shadow-lg rounded-xl">
-                  <User className="w-12 h-12 mx-auto mb-4 text-blue-300" />
-                  <p className="mb-1 text-sm font-semibold text-gray-700">
-                    {searchTerm ? 'કોઈ ગ્રાહક મળ્યો નથી' : 'કોઈ ગ્રાહક નથી'}
-                  </p>
-                  <p className="text-xs text-blue-600">
-                    {searchTerm ? 'શોધ માપદંડ બદલીને ફરી પ્રયાસ કરો' : 'નવા ગ્રાહકો ઉમેરો'}
-                  </p>
-                </div>
-              ) : (
-                filteredClients.map((client) => (
-                  <motion.div
-                    key={client.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="overflow-hidden transition-all duration-200 bg-white border-2 border-blue-100 shadow-lg cursor-pointer rounded-xl hover:shadow-xl hover:border-blue-200"
-                    onClick={() => handleClientSelect(client)}
-                  >
-                    <div className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center justify-center w-10 h-10 text-sm font-bold text-white rounded-full shadow-md bg-gradient-to-r from-blue-500 to-indigo-500">
-                          {client.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-sm font-bold text-gray-900">{client.name}</h3>
-                          <div className="flex items-center gap-3 text-xs text-blue-600">
-                            <span className="flex items-center gap-1">
-                              <Hash className="w-3 h-3" />
-                              {client.id}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />
-                              {client.site}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Phone className="w-3 h-3" />
-                              {client.mobile_number}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Selected Client Header */}
-            <div className="p-4 bg-white border-2 border-blue-100 shadow-lg rounded-xl">
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={() => {
-                    setSelectedClient(null);
-                    setClientLedger(null);
-                    setExpandedClient(null);
-                    closeEditModal();
-                  }}
-                  className="flex items-center gap-2 text-blue-600 hover:text-blue-700"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span className="text-sm font-medium">પાછા જાઓ</span>
-                </button>
-                <div className="text-center">
-                  <h2 className="text-sm font-bold text-gray-900">{selectedClient.name}</h2>
-                  <p className="text-xs text-blue-600">ID: {selectedClient.id}</p>
-                  {clientLedger && (
-                    <p className="text-xs font-medium text-red-600">
-                      કુલ બાકી: {clientLedger.total_outstanding} પ્લેટ્સ
-                    </p>
-                  )}
-                </div>
-                <div className="w-16"></div>
-              </div>
-            </div>
-
-            {/* Client Ledger View */}
-            {loading ? (
-              <div className="space-y-3">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="p-3 bg-white border border-blue-100 shadow-sm rounded-xl animate-pulse">
-                    <div className="w-2/3 h-4 mb-2 bg-blue-200 rounded"></div>
-                    <div className="w-1/2 h-3 bg-blue-200 rounded"></div>
-                  </div>
-                ))}
-              </div>
-            ) : !clientLedger?.has_activity ? (
-              <div className="py-8 text-center bg-white border-2 border-blue-100 shadow-lg rounded-xl">
-                <FileText className="w-12 h-12 mx-auto mb-4 text-blue-300" />
-                <p className="mb-1 text-sm font-semibold text-gray-700">કોઈ ચલણ પ્રવૃત્તિ નથી</p>
-                <p className="text-xs text-blue-600">આ ગ્રાહક માટે કોઈ ચલણ બનાવવામાં આવ્યું નથી</p>
-              </div>
-            ) : (
-              <div className="overflow-hidden bg-white border-2 border-blue-100 shadow-lg rounded-xl">
-                <div className="p-3 bg-gradient-to-r from-blue-500 to-indigo-500">
-                  <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-                    <Package className="w-4 h-4" />
-                    પ્લેટ પ્રવૃત્તિ
-                  </h3>
-                </div>
-                
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-white bg-gradient-to-r from-blue-500 to-indigo-500">
-                        <th className="px-2 py-2 font-bold text-left">ચલણ નં.</th>
-                        <th className="px-2 py-2 font-bold text-center">તારીખ</th>
-                        <th className="px-2 py-2 font-bold text-center">કુલ</th>
-                        <th className="px-2 py-2 font-bold text-center">પ્રકાર</th>
-                        <th className="px-2 py-2 font-bold text-center">ડ્રાઈવર</th>
-                        <th className="px-2 py-2 font-bold text-center">ક્રિયાઓ</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {clientLedger?.all_transactions.map((transaction) => (
-                        <tr 
-                          key={`${transaction.type}-${transaction.id}`}
-                          className={`border-b border-blue-100 hover:bg-blue-25 transition-colors ${
-                            transaction.type === 'udhar' ? 'bg-red-50' : 'bg-green-50'
-                          }`}
-                        >
-                          <td className="px-2 py-2">
-                            <div className="text-xs font-semibold text-gray-900">
-                              #{transaction.number}
-                            </div>
-                          </td>
-                          <td className="px-2 py-2 text-center">
-                            <div className="text-xs font-medium text-blue-600">
-                              {format(new Date(transaction.date), 'dd/MM/yy')}
-                            </div>
-                          </td>
-                          <td className="px-2 py-2 text-center">
-                            <div className="text-xs font-medium text-blue-600">
-                              {transaction.items.reduce((sum, item) => {
-                                const regularQty = item.quantity || 0;
-                                const borrowedQty = transaction.type === 'udhar' 
-                                  ? (item.borrowed_stock || 0) 
-                                  : (item.returned_borrowed_stock || 0);
-                                return sum + regularQty + borrowedQty;
-                              }, 0)}
-                            </div>
-                          </td>
-                          <td className="px-2 py-2 text-center">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              transaction.type === 'udhar' 
-                                ? 'bg-red-100 text-red-800' 
-                                : 'bg-green-100 text-green-800'
-                            }`}>
-                              {transaction.type === 'udhar' ? 'ઉધાર' : 'જમા'}
-                            </span>
-                          </td>
-                          <td className="px-2 py-2 text-center">
-                            <div className="text-xs font-medium text-gray-600">
-                              {transaction.driver_name || '-'}
-                            </div>
-                          </td>
-                          <td className="px-2 py-2">
-                            <div className="flex items-center justify-center gap-1">
-                              {/* COMPLETELY NEW EDIT BUTTON APPROACH */}
-                              {user?.isAdmin ? (
-                                <div
-                                  onClick={() => {
-                                    console.log('🎯 DIV CLICKED - Opening edit for:', transaction.id, transaction.type);
-                                    openEditModal(transaction.id, transaction.type);
-                                  }}
-                                  className="p-1 text-blue-600 transition-colors rounded cursor-pointer hover:bg-blue-50"
-                                  title="એડિટ"
-                                >
-                                  <Edit className="w-3 h-3" />
-                                </div>
-                              ) : (
-                                <div className="p-1 text-gray-400">
-                                  <Lock className="w-3 h-3" />
-                                </div>
-                              )}
-                              
-                              {/* View Button */}
-                              <button
-                                onClick={() => setExpandedClient(
-                                  expandedClient === `${transaction.type}-${transaction.id}` 
-                                    ? null 
-                                    : `${transaction.type}-${transaction.id}`
-                                )}
-                                className="p-1 text-blue-600 transition-colors rounded hover:bg-blue-50"
-                                title="જુઓ"
-                              >
-                                <Eye className="w-3 h-3" />
-                              </button>
-                              
-                              {/* Download Button */}
-                              <button
-                                onClick={() => handleDownload(transaction)}
-                                disabled={downloading === transaction.id}
-                                className="p-1 text-green-600 transition-colors rounded hover:bg-green-50 disabled:opacity-50"
-                                title="ડાઉનલોડ"
-                              >
-                                {downloading === transaction.id ? (
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                ) : (
-                                  <Download className="w-3 h-3" />
-                                )}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Expanded Transaction Details */}
-                <AnimatePresence>
-                  {expandedClient && clientLedger?.all_transactions.map((transaction) => {
-                    const isExpanded = expandedClient === `${transaction.type}-${transaction.id}`;
-                    if (!isExpanded) return null;
-
-                    return (
-                      <motion.div
-                        key={`expanded-${transaction.type}-${transaction.id}`}
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="border-t-2 border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50"
-                      >
-                        <div className="p-3 space-y-3">
-                          <h4 className="text-sm font-bold text-blue-900">પ્લેટ વિગતો</h4>
-                          <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                            {transaction.items.map((item, index) => {
-                              const regularQty = item.quantity || 0;
-                              const borrowedQty = transaction.type === 'udhar' 
-                                ? (item.borrowed_stock || 0) 
-                                : (item.returned_borrowed_stock || 0);
-                              
-                              if (regularQty === 0 && borrowedQty === 0) return null;
-
-                              return (
-                                <div key={index} className="p-2 bg-white border border-blue-200 rounded-lg">
-                                  <div className="text-xs font-medium text-gray-900">{item.plate_size}</div>
-                                  <div className="flex items-center gap-1 mt-1">
-                                    {regularQty > 0 && (
-                                      <span className={`text-xs font-bold ${
-                                        transaction.type === 'udhar' ? 'text-red-600' : 'text-green-600'
-                                      }`}>
-                                        {regularQty}
-                                      </span>
-                                    )}
-                                    {borrowedQty > 0 && (
-                                      <span className="text-xs font-bold text-purple-600">
-                                        +{borrowedQty}*
-                                      </span>
-                                    )}
-                                  </div>
-                                  {item.notes && (
-                                    <div className="mt-1 text-xs text-blue-500">{item.notes}</div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </AnimatePresence>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* NEW SIMPLE EDIT MODAL */}
-        {editState.isOpen && user?.isAdmin && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-blue-900/30 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border-4 border-blue-200">
-              <div className="p-4 text-white bg-gradient-to-r from-blue-600 to-indigo-600">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-base font-semibold">
-                    {editState.transactionType === 'udhar' ? 'ઉધાર' : 'જમા'} ચલણ એડિટ કરો - #{editState.challanNumber}
-                  </h2>
-                  <button
-                    onClick={closeEditModal}
-                    className="p-2 transition-colors rounded-lg hover:bg-blue-500/20"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-4 space-y-4">
-                {/* Basic Details */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="block mb-2 text-sm font-medium text-blue-700">
-                      ચલણ નંબર
-                    </label>
-                    <input
-                      type="text"
-                      value={editState.challanNumber}
-                      onChange={(e) => updateEditField('challanNumber', e.target.value)}
-                      className="w-full px-3 py-2 text-sm border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block mb-2 text-sm font-medium text-blue-700">
-                      તારીખ
-                    </label>
-                    <input
-                      type="date"
-                      value={editState.date}
-                      onChange={(e) => updateEditField('date', e.target.value)}
-                      className="w-full px-3 py-2 text-sm border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Driver Name */}
-                <div>
-                  <label className="block mb-2 text-sm font-medium text-blue-700">
-                    ડ્રાઈવરનું નામ
-                  </label>
+        {/* Filters Panel */}
+        {showFilters && (
+          <div className="bg-gray-50 rounded-lg p-4 mb-6 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <input
                     type="text"
-                    value={editState.driverName}
-                    onChange={(e) => updateEditField('driverName', e.target.value)}
-                    list="driver-suggestions"
-                    className="w-full px-3 py-2 text-sm border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                    placeholder="ડ્રાઈવરનું નામ દાખલ કરો"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Search by client, challan number..."
                   />
-                  <datalist id="driver-suggestions">
-                    {previousDrivers.map((driver, index) => (
-                      <option key={index} value={driver} />
-                    ))}
-                  </datalist>
                 </div>
+              </div>
 
-                {/* Stock Warning */}
-                {stockValidation.length > 0 && editState.transactionType === 'udhar' && (
-                  <div className="flex items-center gap-2 p-3 border rounded-lg text-amber-600 bg-amber-50 border-amber-200">
-                    <AlertTriangle className="w-4 h-4" />
-                    <span className="text-sm font-medium">કેટલીક વસ્તુઓમાં અપૂરતો સ્ટોક છે.</span>
-                  </div>
-                )}
-
-                {/* Plate Quantities Table */}
+              {activeTab === 'udhar' && (
                 <div>
-                  <label className="block mb-3 text-sm font-medium text-blue-700">
-                    પ્લેટ માત્રા
-                  </label>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs border border-gray-200 rounded-lg">
-                      <thead>
-                        <tr className="bg-gray-50">
-                          <th className="px-3 py-2 font-medium text-left text-gray-700">સાઇઝ</th>
-                          {editState.transactionType === 'udhar' && (
-                            <th className="px-3 py-2 font-medium text-center text-gray-700">સ્ટોક</th>
-                          )}
-                          <th className="px-3 py-2 font-medium text-center text-gray-700">માત્રા</th>
-                          <th className="px-3 py-2 font-medium text-center text-gray-700">બિજો ડેપો</th>
-                          <th className="px-3 py-2 font-medium text-center text-gray-700">નોંધ</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {PLATE_SIZES.map(size => {
-                          const stockInfo = getStockInfo(size);
-                          const isInsufficient = isStockInsufficient(size);
-                          const plateInfo = editState.plateData[size] || { quantity: 0, borrowedStock: 0, notes: '' };
-                          
-                          return (
-                            <tr key={size} className={`border-b hover:bg-gray-50 ${isInsufficient ? 'bg-red-50' : ''}`}>
-                              <td className="px-3 py-2">
-                                <div className="flex items-center gap-2">
-                                  <Package className="w-3 h-3 text-gray-500" />
-                                  <span className="font-medium text-gray-900">{size}</span>
-                                </div>
-                              </td>
-                              {editState.transactionType === 'udhar' && (
-                                <td className="px-3 py-2 text-center">
-                                  <span className={`text-xs ${stockInfo ? 'text-gray-600' : 'text-red-500'}`}>
-                                    {stockInfo ? stockInfo.available_quantity : 'N/A'}
-                                  </span>
-                                </td>
-                              )}
-                              <td className="px-3 py-2 text-center">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={plateInfo.quantity || ''}
-                                  onChange={(e) => updatePlateData(size, 'quantity', parseInt(e.target.value) || 0)}
-                                  className={`w-16 px-2 py-1 text-xs text-center border rounded focus:ring-1 ${
-                                    isInsufficient 
-                                      ? 'border-red-300 focus:ring-red-200 focus:border-red-500' 
-                                      : 'border-gray-300 focus:ring-blue-200 focus:border-blue-500'
-                                  }`}
-                                  placeholder="0"
-                                />
-                                {isInsufficient && (
-                                  <div className="mt-1 text-xs text-red-600">
-                                    સ્ટોક: {stockValidation.find(item => item.size === size)?.available}
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 text-center">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={plateInfo.borrowedStock || ''}
-                                  onChange={(e) => updatePlateData(size, 'borrowedStock', parseInt(e.target.value) || 0)}
-                                  className="w-16 px-2 py-1 text-xs text-center border border-purple-300 rounded bg-purple-50 focus:ring-1 focus:ring-purple-200 focus:border-purple-500"
-                                  placeholder="0"
-                                />
-                              </td>
-                              <td className="px-3 py-2 text-center">
-                                <input
-                                  type="text"
-                                  value={plateInfo.notes || ''}
-                                  onChange={(e) => updatePlateData(size, 'notes', e.target.value)}
-                                  className="w-20 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-200 focus:border-blue-500"
-                                  placeholder="નોંધ"
-                                />
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="completed">Completed</option>
+                  </select>
                 </div>
+              )}
 
-                {/* Totals Display */}
-                <div className="p-3 border border-blue-200 rounded-lg bg-blue-50">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex-1 p-2 bg-white border border-blue-200 rounded">
-                      <div className="text-xs text-center">
-                        <div className="font-medium text-blue-800">પોતાની પ્લેટ</div>
-                        <div className="text-lg font-bold text-blue-700">
-                          {Object.values(editState.plateData).reduce((sum, data) => sum + (data.quantity || 0), 0)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex-1 p-2 bg-white border border-purple-200 rounded">
-                      <div className="text-xs text-center">
-                        <div className="font-medium text-purple-800">બિજો ડેપો</div>
-                        <div className="text-lg font-bold text-purple-700">
-                          {Object.values(editState.plateData).reduce((sum, data) => sum + (data.borrowedStock || 0), 0)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex-1 p-2 rounded bg-gradient-to-r from-blue-500 to-indigo-500">
-                      <div className="text-center">
-                        <div className="text-xs font-medium text-blue-100">કુલ પ્લેટ</div>
-                        <div className="text-lg font-bold text-white">
-                          {Object.values(editState.plateData).reduce((sum, data) => sum + (data.quantity || 0) + (data.borrowedStock || 0), 0)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortBy)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="date_desc">Date (Newest First)</option>
+                  <option value="date_asc">Date (Oldest First)</option>
+                  <option value="client_name">Client Name</option>
+                  <option value="challan_number">Challan Number</option>
+                </select>
+              </div>
+            </div>
+
+            {hasActiveFilters && (
+              <div className="flex justify-end">
+                <button
+                  onClick={resetFilters}
+                  className="flex items-center gap-2 px-3 py-1 text-sm text-red-600 hover:text-red-700"
+                >
+                  <X className="w-4 h-4" />
+                  Reset Filters
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Challans List */}
+        <div className="space-y-4">
+          {activeTab === 'udhar' ? (
+            filteredAndSortedUdharChallans.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <p>No udhar challans found</p>
+              </div>
+            ) : (
+              filteredAndSortedUdharChallans.map((challan) => (
+                <UdharChallanCard
+                  key={challan.id}
+                  challan={challan}
+                  onDownload={() => handleDownloadChallan(challan, 'udhar')}
+                  onDelete={() => handleDeleteUdharChallan(challan.id)}
+                  downloading={downloading === `udhar-${challan.id}`}
+                  expanded={expandedChallan === `udhar-${challan.id}`}
+                  onToggleExpand={() => toggleChallanExpansion(`udhar-${challan.id}`)}
+                  isAdmin={user?.isAdmin || false}
+                />
+              ))
+            )
+          ) : (
+            filteredAndSortedJamaChallans.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <RotateCcw className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <p>No jama challans found</p>
+              </div>
+            ) : (
+              filteredAndSortedJamaChallans.map((challan) => (
+                <JamaChallanCard
+                  key={challan.id}
+                  challan={challan}
+                  onDownload={() => handleDownloadChallan(challan, 'jama')}
+                  onDelete={() => handleDeleteJamaChallan(challan.id)}
+                  downloading={downloading === `jama-${challan.id}`}
+                  expanded={expandedChallan === `jama-${challan.id}`}
+                  onToggleExpand={() => toggleChallanExpansion(`jama-${challan.id}`)}
+                  isAdmin={user?.isAdmin || false}
+                />
+              ))
+            )
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Udhar Challan Card Component
+interface UdharChallanCardProps {
+  challan: ChallanWithItems
+  onDownload: () => void
+  onDelete: () => void
+  downloading: boolean
+  expanded: boolean
+  onToggleExpand: () => void
+  isAdmin: boolean
+}
+
+function UdharChallanCard({ challan, onDownload, onDelete, downloading, expanded, onToggleExpand, isAdmin }: UdharChallanCardProps) {
+  const totalQuantity = challan.challan_items.reduce((sum, item) => sum + item.borrowed_quantity + (item.borrowed_stock || 0), 0)
+  const daysAgo = Math.floor((new Date().getTime() - new Date(challan.challan_date).getTime()) / (1000 * 60 * 60 * 24))
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+      <div 
+        className="p-4 cursor-pointer"
+        onClick={onToggleExpand}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-red-50 rounded-lg">
+              <FileText className="w-6 h-6 text-red-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">#{challan.challan_number}</h3>
+              <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
+                <div className="flex items-center gap-1">
+                  <Calendar className="w-4 h-4" />
+                  {new Date(challan.challan_date).toLocaleDateString()}
                 </div>
-
-                {/* Action Buttons */}
-                <div className="flex flex-col gap-2 pt-4 border-t-2 border-blue-100 sm:flex-row">
-                  <button
-                    onClick={handleSaveEdit}
-                    disabled={editLoading}
-                    className="flex items-center justify-center flex-1 gap-2 px-4 py-3 text-sm font-medium text-white transition-colors rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:opacity-50"
-                  >
-                    {editLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Save className="w-4 h-4" />
-                    )}
-                    સેવ કરો
-                  </button>
-                  <button
-                    onClick={handleDeleteChallan}
-                    disabled={editLoading}
-                    className="flex items-center justify-center flex-1 gap-2 px-4 py-3 text-sm font-medium text-white transition-colors rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 disabled:opacity-50"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    ડિલીટ કરો
-                  </button>
-                  <button
-                    onClick={closeEditModal}
-                    disabled={editLoading}
-                    className="flex-1 px-4 py-3 text-sm font-medium text-white transition-colors bg-gray-500 rounded-lg hover:bg-gray-600 disabled:opacity-50"
-                  >
-                    રદ કરો
-                  </button>
+                <div className="flex items-center gap-1">
+                  <Package className="w-4 h-4" />
+                  {totalQuantity} plates
+                </div>
+                <div className="flex items-center gap-1">
+                  <Clock className="w-4 h-4" />
+                  {daysAgo} days ago
                 </div>
               </div>
             </div>
           </div>
-        )}
+          
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+              challan.status === 'active' 
+                ? 'bg-yellow-100 text-yellow-800' 
+                : 'bg-green-100 text-green-800'
+            }`}>
+              {challan.status === 'active' ? 'Active' : 'Completed'}
+            </span>
+            
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onDownload()
+              }}
+              disabled={downloading}
+              className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+            
+            {isAdmin && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete()
+                }}
+                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            
+            {expanded ? (
+              <ChevronUp className="w-5 h-5 text-gray-400" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-gray-400" />
+            )}
+          </div>
+        </div>
       </div>
+
+      {expanded && (
+        <div className="border-t border-gray-200 p-4 bg-gray-50">
+          {/* Client Details */}
+          <div className="mb-4 p-3 bg-white rounded-lg border border-gray-200">
+            <h4 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+              <User className="w-4 h-4 text-blue-600" />
+              Client Details
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+              <div className="flex items-center gap-2">
+                <Hash className="w-3 h-3 text-gray-400" />
+                <span className="text-gray-600">ID:</span>
+                <span className="font-medium">{challan.client.id}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <User className="w-3 h-3 text-gray-400" />
+                <span className="text-gray-600">Name:</span>
+                <span className="font-medium">{challan.client.name}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <MapPin className="w-3 h-3 text-gray-400" />
+                <span className="text-gray-600">Site:</span>
+                <span className="font-medium">{challan.client.site}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Phone className="w-3 h-3 text-gray-400" />
+                <span className="text-gray-600">Mobile:</span>
+                <span className="font-medium">{challan.client.mobile_number}</span>
+              </div>
+              {challan.driver_name && (
+                <div className="flex items-center gap-2">
+                  <User className="w-3 h-3 text-gray-400" />
+                  <span className="text-gray-600">Driver:</span>
+                  <span className="font-medium">{challan.driver_name}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Plate Details */}
+          <div>
+            <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+              <Package className="w-4 h-4 text-green-600" />
+              Plate Details
+            </h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="px-3 py-2 text-left font-medium text-gray-700">Plate Size</th>
+                    <th className="px-3 py-2 text-center font-medium text-gray-700">Own Stock</th>
+                    <th className="px-3 py-2 text-center font-medium text-gray-700">Borrowed Stock</th>
+                    <th className="px-3 py-2 text-center font-medium text-gray-700">Total</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-700">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {challan.challan_items.map((item) => (
+                    <tr key={item.id} className="border-t border-gray-200">
+                      <td className="px-3 py-2 font-medium">{item.plate_size}</td>
+                      <td className="px-3 py-2 text-center">{item.borrowed_quantity}</td>
+                      <td className="px-3 py-2 text-center text-red-600 font-medium">
+                        {item.borrowed_stock || 0}
+                      </td>
+                      <td className="px-3 py-2 text-center font-bold">
+                        {item.borrowed_quantity + (item.borrowed_stock || 0)}
+                      </td>
+                      <td className="px-3 py-2 text-gray-600">
+                        {item.partner_stock_notes || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  );
+  )
+}
+
+// Jama Challan Card Component
+interface JamaChallanCardProps {
+  challan: ReturnWithItems
+  onDownload: () => void
+  onDelete: () => void
+  downloading: boolean
+  expanded: boolean
+  onToggleExpand: () => void
+  isAdmin: boolean
+}
+
+function JamaChallanCard({ challan, onDownload, onDelete, downloading, expanded, onToggleExpand, isAdmin }: JamaChallanCardProps) {
+  const totalQuantity = challan.return_line_items.reduce((sum, item) => 
+    sum + item.returned_quantity + (item.returned_borrowed_stock || 0), 0
+  )
+  const daysAgo = Math.floor((new Date().getTime() - new Date(challan.return_date).getTime()) / (1000 * 60 * 60 * 24))
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+      <div 
+        className="p-4 cursor-pointer"
+        onClick={onToggleExpand}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-green-50 rounded-lg">
+              <RotateCcw className="w-6 h-6 text-green-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">#{challan.return_challan_number}</h3>
+              <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
+                <div className="flex items-center gap-1">
+                  <Calendar className="w-4 h-4" />
+                  {new Date(challan.return_date).toLocaleDateString()}
+                </div>
+                <div className="flex items-center gap-1">
+                  <Package className="w-4 h-4" />
+                  {totalQuantity} plates
+                </div>
+                <div className="flex items-center gap-1">
+                  <Clock className="w-4 h-4" />
+                  {daysAgo} days ago
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+              Returned
+            </span>
+            
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onDownload()
+              }}
+              disabled={downloading}
+              className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+            
+            {isAdmin && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete()
+                }}
+                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            
+            {expanded ? (
+              <ChevronUp className="w-5 h-5 text-gray-400" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-gray-400" />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="border-t border-gray-200 p-4 bg-gray-50">
+          {/* Client Details */}
+          <div className="mb-4 p-3 bg-white rounded-lg border border-gray-200">
+            <h4 className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+              <User className="w-4 h-4 text-blue-600" />
+              Client Details
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+              <div className="flex items-center gap-2">
+                <Hash className="w-3 h-3 text-gray-400" />
+                <span className="text-gray-600">ID:</span>
+                <span className="font-medium">{challan.client.id}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <User className="w-3 h-3 text-gray-400" />
+                <span className="text-gray-600">Name:</span>
+                <span className="font-medium">{challan.client.name}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <MapPin className="w-3 h-3 text-gray-400" />
+                <span className="text-gray-600">Site:</span>
+                <span className="font-medium">{challan.client.site}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Phone className="w-3 h-3 text-gray-400" />
+                <span className="text-gray-600">Mobile:</span>
+                <span className="font-medium">{challan.client.mobile_number}</span>
+              </div>
+              {challan.driver_name && (
+                <div className="flex items-center gap-2">
+                  <User className="w-3 h-3 text-gray-400" />
+                  <span className="text-gray-600">Driver:</span>
+                  <span className="font-medium">{challan.driver_name}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Plate Details */}
+          <div>
+            <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+              <Package className="w-4 h-4 text-green-600" />
+              Plate Details
+            </h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="px-3 py-2 text-left font-medium text-gray-700">Plate Size</th>
+                    <th className="px-3 py-2 text-center font-medium text-gray-700">Own Stock</th>
+                    <th className="px-3 py-2 text-center font-medium text-gray-700">Borrowed Stock</th>
+                    <th className="px-3 py-2 text-center font-medium text-gray-700">Damaged</th>
+                    <th className="px-3 py-2 text-center font-medium text-gray-700">Lost</th>
+                    <th className="px-3 py-2 text-center font-medium text-gray-700">Total</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-700">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {challan.return_line_items.map((item) => (
+                    <tr key={item.id} className="border-t border-gray-200">
+                      <td className="px-3 py-2 font-medium">{item.plate_size}</td>
+                      <td className="px-3 py-2 text-center">{item.returned_quantity}</td>
+                      <td className="px-3 py-2 text-center text-purple-600 font-medium">
+                        {item.returned_borrowed_stock || 0}
+                      </td>
+                      <td className="px-3 py-2 text-center text-red-600">
+                        {item.damaged_quantity || 0}
+                      </td>
+                      <td className="px-3 py-2 text-center text-red-600">
+                        {item.lost_quantity || 0}
+                      </td>
+                      <td className="px-3 py-2 text-center font-bold">
+                        {item.returned_quantity + (item.returned_borrowed_stock || 0)}
+                      </td>
+                      <td className="px-3 py-2 text-gray-600">
+                        {item.damage_notes || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }

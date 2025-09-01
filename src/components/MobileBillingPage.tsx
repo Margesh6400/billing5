@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ComprehensiveBillManagement } from './billing/ComprehensiveBillManagement';
+import { DynamicBillManagement } from './billing/DynamicBillManagement';
 
 export function MobileBillingPage() {
-  return <ComprehensiveBillManagement />;
+  return <DynamicBillManagement />;
 }

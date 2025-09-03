@@ -20,7 +20,12 @@ import {
   Trash2,
   Edit3,
   Save,
-  X
+  X,
+  Users,
+  Target,
+  Percent,
+  ToggleLeft,
+  ToggleRight
 } from 'lucide-react';
 import { 
   ComprehensiveBillingCalculator, 
@@ -52,15 +57,21 @@ export function ComprehensiveBillManagement() {
   const [endDate, setEndDate] = useState('');
   const [advancePaid, setAdvancePaid] = useState(0);
   
-  // Billing rates with dynamic service percentage
+  // Billing rates with dynamic service rate per plate
   const [rates, setRates] = useState<BillingRates>({
     daily_rent_rate: 1.00,
     service_charge_percentage: 10.0
   });
   
+  // NEW: Dynamic service rate per plate
+  const [serviceRatePerPlate, setServiceRatePerPlate] = useState(10.0); // ₹10 per plate default
+  
   // Override fields
-  const [overrideTotalUdhar, setOverrideTotalUdhar] = useState<number | undefined>(undefined);
+  const [overrideTotalPlates, setOverrideTotalPlates] = useState<number | undefined>(undefined);
   const [overrideServiceCharge, setOverrideServiceCharge] = useState<number | undefined>(undefined);
+  
+  // NEW: Account closure option
+  const [accountClosure, setAccountClosure] = useState<'close' | 'continue'>('continue');
   
   // Dynamic sections
   const [extraCharges, setExtraCharges] = useState<ExtraCharge[]>([]);
@@ -78,12 +89,19 @@ export function ComprehensiveBillManagement() {
     generateBillNumber();
   }, []);
 
-  // Recalculate when rates change
+  // Recalculate when service rate per plate changes
   useEffect(() => {
     if (billData && selectedClient) {
       handleCalculateBill();
     }
-  }, [rates.service_charge_percentage]);
+  }, [serviceRatePerPlate]);
+
+  // Recalculate when total plates override changes
+  useEffect(() => {
+    if (billData && selectedClient && overrideTotalPlates !== undefined) {
+      handleCalculateBill();
+    }
+  }, [overrideTotalPlates]);
 
   const fetchClients = async () => {
     try {
@@ -135,8 +153,10 @@ export function ComprehensiveBillManagement() {
         extraCharges,
         discounts,
         payments,
-        overrideTotalUdhar,
-        overrideServiceCharge
+        overrideTotalPlates,
+        overrideServiceCharge,
+        serviceRatePerPlate,
+        accountClosure
       );
 
       calculatedBill.bill_number = billNumber;
@@ -164,8 +184,9 @@ export function ComprehensiveBillManagement() {
       setExtraCharges([]);
       setDiscounts([]);
       setPayments([]);
-      setOverrideTotalUdhar(undefined);
+      setOverrideTotalPlates(undefined);
       setOverrideServiceCharge(undefined);
+      setAccountClosure('continue');
       await generateBillNumber();
       
       alert('બિલ સફળતાપૂર્વક જનરેટ અને ડાઉનલોડ થયું!');
@@ -317,7 +338,7 @@ export function ComprehensiveBillManagement() {
             <Calculator className="w-5 h-5 text-white" />
           </div>
           <h1 className="mb-1 text-base font-bold text-gray-900">કમ્પ્રીહેન્સિવ બિલિંગ</h1>
-          <p className="text-xs text-blue-600">ડાયનેમિક સર્વિસ ચાર્જ સાથે</p>
+          <p className="text-xs text-blue-600">ડાયનેમિક પ્લેટ અને સર્વિસ ચાર્જ</p>
         </div>
 
         {/* Client Selection */}
@@ -490,15 +511,14 @@ export function ComprehensiveBillManagement() {
                 </div>
                 <div>
                   <label className="block mb-1 text-xs font-medium text-gray-700">
-                    સર્વિસ ચાર્જ (%)
+                    સર્વિસ ચાર્જ (₹/પ્લેટ)
                   </label>
                   <input
                     type="number"
                     step="0.1"
                     min="0"
-                    max="100"
-                    value={rates.service_charge_percentage}
-                    onChange={(e) => updateRate('service_charge_percentage', parseFloat(e.target.value) || 0)}
+                    value={serviceRatePerPlate}
+                    onChange={(e) => setServiceRatePerPlate(parseFloat(e.target.value) || 0)}
                     className="w-full px-3 py-2 text-sm border-2 border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-100 focus:border-purple-500"
                   />
                 </div>
@@ -809,61 +829,71 @@ export function ComprehensiveBillManagement() {
                 </table>
               </div>
 
-              {/* Total Udhar with Override Option */}
+              {/* Total Udhar */}
               <div className="p-3 border border-blue-200 rounded bg-blue-50">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-bold text-blue-800">કુલ ઉધાર (Total Udhar):</span>
+                  <span className="text-lg font-bold text-blue-600">₹{billData.total_udhar.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* NEW: Dynamic Total Plates with Override Option */}
+              <div className="p-3 border border-cyan-200 rounded bg-cyan-50">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-bold text-cyan-800">કુલ પ્લેટ (Total Plates):</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold text-blue-600">₹{billData.total_udhar.toFixed(2)}</span>
+                    <span className="text-lg font-bold text-cyan-600">{billData.total_plates}</span>
                     <button
                       onClick={() => {
-                        const newValue = prompt('કુલ ઉધાર ઓવરરાઇડ કરો:', billData.total_udhar.toString());
+                        const newValue = prompt('કુલ પ્લેટ ઓવરરાઇડ કરો:', billData.total_plates.toString());
                         if (newValue !== null) {
-                          setOverrideTotalUdhar(parseFloat(newValue) || billData.total_udhar);
-                          handleCalculateBill();
+                          const parsedValue = parseInt(newValue) || billData.total_plates;
+                          setOverrideTotalPlates(parsedValue);
                         }
                       }}
-                      className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                      className="p-1 text-cyan-600 hover:bg-cyan-100 rounded"
                     >
                       <Edit3 className="w-3 h-3" />
                     </button>
                   </div>
                 </div>
-                {overrideTotalUdhar !== undefined && (
-                  <div className="text-xs text-blue-600">
-                    મૂળ ગણતરી: ₹{billData.date_ranges.reduce((sum, range) => sum + range.rent_amount, 0).toFixed(2)}
+                <div className="text-xs text-cyan-600">
+                  ગણતરી: {billData.total_plates_udhar} ઉધાર - {billData.total_plates_jama} જમા = {billData.total_plates_udhar - billData.total_plates_jama}
+                </div>
+                {overrideTotalPlates !== undefined && (
+                  <div className="text-xs text-cyan-600">
+                    મૂળ ગણતરી: {billData.total_plates_udhar - billData.total_plates_jama} પ્લેટ
                   </div>
                 )}
               </div>
 
-              {/* Service Charge with Dynamic Percentage */}
-              <div className="p-3 border border-purple-200 rounded bg-purple-50">
+              {/* NEW: Dynamic Service Charge with Per-Plate Rate */}
+              <div className="p-3 border border-indigo-200 rounded bg-indigo-50">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-bold text-purple-800">
-                    સેવા ચાર્જ ({billData.service_charge_percentage}%):
+                  <span className="text-sm font-bold text-indigo-800">
+                    સેવા ચાર્જ (₹{billData.service_rate_per_plate}/પ્લેટ):
                   </span>
                   <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold text-purple-600">₹{billData.service_charge.toFixed(2)}</span>
+                    <span className="text-lg font-bold text-indigo-600">₹{billData.service_charge.toFixed(2)}</span>
                     <button
                       onClick={() => {
                         const newValue = prompt('સેવા ચાર્જ ઓવરરાઇડ કરો:', billData.service_charge.toString());
                         if (newValue !== null) {
                           setOverrideServiceCharge(parseFloat(newValue) || billData.service_charge);
-                          handleCalculateBill();
                         }
                       }}
-                      className="p-1 text-purple-600 hover:bg-purple-100 rounded"
+                      className="p-1 text-indigo-600 hover:bg-indigo-100 rounded"
                     >
                       <Edit3 className="w-3 h-3" />
                     </button>
                   </div>
                 </div>
-                <div className="text-xs text-purple-600">
-                  ગણતરી: ₹{billData.total_udhar.toFixed(2)} × {billData.service_charge_percentage}% = ₹{((billData.total_udhar * billData.service_charge_percentage) / 100).toFixed(2)}
+                <div className="text-xs text-indigo-600">
+                  ગણતરી: {billData.total_plates} પ્લેટ × ₹{billData.service_rate_per_plate} = ₹{(billData.total_plates * billData.service_rate_per_plate).toFixed(2)}
                 </div>
                 {overrideServiceCharge !== undefined && (
-                  <div className="text-xs text-purple-600">
-                    મૂળ ગણતરી: ₹{((billData.total_udhar * billData.service_charge_percentage) / 100).toFixed(2)}
+                  <div className="text-xs text-indigo-600">
+                    મૂળ ગણતરી: ₹{(billData.total_plates * billData.service_rate_per_plate).toFixed(2)}
                   </div>
                 )}
               </div>
@@ -927,7 +957,7 @@ export function ComprehensiveBillManagement() {
                     <span className="font-bold">₹{billData.total_udhar.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>સેવા ચાર્જ ({billData.service_charge_percentage}%):</span>
+                    <span>સેવા ચાર્જ ({billData.total_plates} પ્લેટ × ₹{billData.service_rate_per_plate}):</span>
                     <span className="font-bold">₹{billData.service_charge.toFixed(2)}</span>
                   </div>
                   {billData.extra_charges_total > 0 && (
@@ -968,6 +998,47 @@ export function ComprehensiveBillManagement() {
                         billData.balance_carry_forward > 0 ? billData.balance_carry_forward.toFixed(2) : '0.00'}
                     </span>
                   </div>
+                </div>
+              </div>
+
+              {/* NEW: Account Closure Option */}
+              <div className="p-3 border-2 border-yellow-300 rounded-lg bg-yellow-50">
+                <h4 className="flex items-center gap-2 mb-3 text-sm font-bold text-yellow-800">
+                  <Target className="w-4 h-4" />
+                  એકાઉન્ટ બંધ કરવાનો વિકલ્પ
+                </h4>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3 p-2 border border-yellow-200 rounded-lg cursor-pointer hover:bg-yellow-100">
+                    <input
+                      type="radio"
+                      name="accountClosure"
+                      value="close"
+                      checked={accountClosure === 'close'}
+                      onChange={(e) => setAccountClosure(e.target.value as 'close' | 'continue')}
+                      className="w-4 h-4 text-red-600"
+                    />
+                    <div className="flex items-center gap-2">
+                      <ToggleRight className="w-4 h-4 text-red-600" />
+                      <span className="text-sm font-medium text-red-700">Account Close</span>
+                    </div>
+                    <span className="text-xs text-red-600">(Finalize ledger, reset balance to 0)</span>
+                  </label>
+                  
+                  <label className="flex items-center gap-3 p-2 border border-yellow-200 rounded-lg cursor-pointer hover:bg-yellow-100">
+                    <input
+                      type="radio"
+                      name="accountClosure"
+                      value="continue"
+                      checked={accountClosure === 'continue'}
+                      onChange={(e) => setAccountClosure(e.target.value as 'close' | 'continue')}
+                      className="w-4 h-4 text-green-600"
+                    />
+                    <div className="flex items-center gap-2">
+                      <ToggleLeft className="w-4 h-4 text-green-600" />
+                      <span className="text-sm font-medium text-green-700">Continue</span>
+                    </div>
+                    <span className="text-xs text-green-600">(Carry forward balance to next cycle)</span>
+                  </label>
                 </div>
               </div>
 

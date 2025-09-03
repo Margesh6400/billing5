@@ -30,7 +30,7 @@ export interface DateRangeBilling {
 
 export interface BillingRates {
   daily_rent_rate: number;
-  service_charge_percentage: number; // Changed from fixed rate to percentage
+  service_charge_percentage: number; // Changed back to percentage for compatibility
 }
 
 export interface ExtraCharge {
@@ -62,11 +62,16 @@ export interface ComprehensiveBillData {
   ledger_entries: LedgerEntry[];
   date_ranges: DateRangeBilling[];
   
-  // Auto-calculated values
-  total_udhar: number; // Auto-calculated from rent calculation
-  total_plates_issued: number;
-  service_charge_percentage: number; // The percentage used
-  service_charge: number; // Calculated amount
+  // Dynamic total plates calculation
+  total_plates_udhar: number; // Total udhar plates
+  total_plates_jama: number; // Total jama plates
+  total_plates: number; // Net plates (udhar - jama) - EDITABLE
+  total_udhar: number; // Rent calculation from date ranges
+  
+  // Dynamic service charge with per-plate rate
+  service_rate_per_plate: number; // Rate per plate (₹/plate) - EDITABLE
+  service_charge_percentage: number; // For display compatibility
+  service_charge: number; // total_plates × service_rate_per_plate - EDITABLE
   
   // User-defined sections
   extra_charges: ExtraCharge[];
@@ -82,13 +87,16 @@ export interface ComprehensiveBillData {
   final_due: number;
   balance_carry_forward: number;
   
+  // Account closure option
+  account_closure: 'close' | 'continue';
+  
   rates: BillingRates;
 }
 
 export class ComprehensiveBillingCalculator {
   private defaultRates: BillingRates = {
     daily_rent_rate: 1.00,
-    service_charge_percentage: 10.0 // Default 10% service charge
+    service_charge_percentage: 10.0 // Keep for compatibility
   };
 
   constructor(rates?: Partial<BillingRates>) {
@@ -160,8 +168,10 @@ export class ComprehensiveBillingCalculator {
     extraCharges: ExtraCharge[] = [],
     discounts: Discount[] = [],
     payments: Payment[] = [],
-    overrideTotalUdhar?: number,
-    overrideServiceCharge?: number
+    overrideTotalPlates?: number,
+    overrideServiceCharge?: number,
+    serviceRatePerPlate: number = 10.0, // Default ₹10 per plate
+    accountClosure: 'close' | 'continue' = 'continue'
   ): ComprehensiveBillData {
     const finalRates = { ...this.defaultRates, ...rates };
 
@@ -314,18 +324,23 @@ export class ComprehensiveBillingCalculator {
       }
     }
 
-    // Step 4: Calculate totals
-    const calculatedTotalUdhar = dateRanges.reduce((sum, range) => sum + range.rent_amount, 0);
-    const totalUdhar = overrideTotalUdhar !== undefined ? overrideTotalUdhar : calculatedTotalUdhar;
+    // Step 4: Calculate dynamic totals
+    const totalUdhar = dateRanges.reduce((sum, range) => sum + range.rent_amount, 0);
     
-    const totalPlatesIssued = challans.reduce((sum, challan) => {
-      return sum + challan.challan_items.reduce((itemSum: number, item: any) => 
-        itemSum + item.borrowed_quantity + (item.borrowed_stock || 0), 0
-      );
-    }, 0);
-
-    // Calculate service charge dynamically
-    const calculatedServiceCharge = (totalUdhar * finalRates.service_charge_percentage) / 100;
+    // Calculate total plates (udhar - jama) - DYNAMIC AND EDITABLE
+    const totalPlatesUdhar = allEntries
+      .filter(entry => entry.type === 'udhar')
+      .reduce((sum, entry) => sum + entry.plates, 0);
+    
+    const totalPlatesJama = allEntries
+      .filter(entry => entry.type === 'jama')
+      .reduce((sum, entry) => sum + entry.plates, 0);
+    
+    const calculatedTotalPlates = totalPlatesUdhar - totalPlatesJama;
+    const totalPlates = overrideTotalPlates !== undefined ? overrideTotalPlates : calculatedTotalPlates;
+    
+    // Calculate service charge dynamically with per-plate rate
+    const calculatedServiceCharge = totalPlates * serviceRatePerPlate;
     const serviceCharge = overrideServiceCharge !== undefined ? overrideServiceCharge : calculatedServiceCharge;
     
     // Calculate totals for other sections
@@ -344,9 +359,12 @@ export class ComprehensiveBillingCalculator {
       bill_date: billDate,
       ledger_entries: ledgerEntries,
       date_ranges: dateRanges,
+      total_plates_udhar: totalPlatesUdhar,
+      total_plates_jama: totalPlatesJama,
+      total_plates: totalPlates,
       total_udhar: totalUdhar,
-      total_plates_issued: totalPlatesIssued,
-      service_charge_percentage: finalRates.service_charge_percentage,
+      service_rate_per_plate: serviceRatePerPlate,
+      service_charge_percentage: finalRates.service_charge_percentage, // Keep for compatibility
       service_charge: serviceCharge,
       extra_charges: extraCharges,
       extra_charges_total: extraChargesTotal,
@@ -358,6 +376,7 @@ export class ComprehensiveBillingCalculator {
       advance_paid: advancePaid,
       final_due: Math.max(0, finalDue),
       balance_carry_forward: balanceCarryForward,
+      account_closure: accountClosure,
       rates: finalRates
     };
   }

@@ -586,3 +586,6 @@ export function ComprehensiveBillManagement() {
     </div>
   );
 }
+
+// Export the component with the name expected by App.tsx
+export const MobileBillingPage = ComprehensiveBillManagement;

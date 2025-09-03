@@ -31,8 +31,25 @@ export interface DateRangeBilling {
 export interface BillingRates {
   daily_rent_rate: number;      // ₹1 by default
   service_charge_rate: number;  // ₹7 by default
-  worker_charge: number;        // ₹100 by default
-  lost_plate_penalty: number;   // ₹250 by default
+}
+
+export interface ExtraCharge {
+  note: string;
+  item_count: number;
+  price: number;
+  total: number; // Auto-calculated: item_count × price
+}
+
+export interface Discount {
+  note: string;
+  item_count: number;
+  price: number;
+  total: number; // Auto-calculated: item_count × price
+}
+
+export interface Payment {
+  note: string;
+  payment_amount: number;
 }
 
 export interface ComprehensiveBillData {
@@ -46,12 +63,16 @@ export interface ComprehensiveBillData {
   total_rent: number;
   total_plates_issued: number;
   service_charge: number;
-  worker_charge: number;
-  lost_plates_count: number;
-  lost_plate_penalty: number;
+  extra_charges: ExtraCharge[];
+  extra_charges_total: number;
+  discounts: Discount[];
+  discounts_total: number;
+  payments: Payment[];
+  payments_total: number;
   grand_total: number;
   advance_paid: number;
   final_due: number;
+  balance_carry_forward: number; // If final_due < 0
   
   // Rates used
   rates: BillingRates;
@@ -60,9 +81,7 @@ export interface ComprehensiveBillData {
 export class ComprehensiveBillingCalculator {
   private defaultRates: BillingRates = {
     daily_rent_rate: 1.00,
-    service_charge_rate: 7.00,
-    worker_charge: 100.00,
-    lost_plate_penalty: 250.00
+    service_charge_rate: 7.00
   };
 
   constructor(rates?: Partial<BillingRates>) {
@@ -132,7 +151,10 @@ export class ComprehensiveBillingCalculator {
     returns: any[],
     billDate: string,
     rates: Partial<BillingRates> = {},
-    advancePaid: number = 0
+    advancePaid: number = 0,
+    extraCharges: ExtraCharge[] = [],
+    discounts: Discount[] = [],
+    payments: Payment[] = []
   ): ComprehensiveBillData {
     const finalRates = { ...this.defaultRates, ...rates };
 
@@ -312,23 +334,22 @@ export class ComprehensiveBillingCalculator {
       );
     }, 0);
 
-    // Calculate lost plates (including damaged and lost from returns)
-    const totalDamagedAndLost = returns.reduce((sum, returnRecord) => {
-      return sum + returnRecord.return_line_items.reduce((itemSum: number, item: any) => 
-        itemSum + (item.damaged_quantity || 0) + (item.lost_quantity || 0), 0
-      );
-    }, 0);
-
-    const lostPlatesCount = Math.max(0, totalPlatesIssued - totalPlatesReturned + totalDamagedAndLost);
-
     // Calculate charges
     const serviceCharge = totalPlatesIssued * finalRates.service_charge_rate;
-    const workerCharge = finalRates.worker_charge;
-    const lostPlatePenalty = lostPlatesCount * finalRates.lost_plate_penalty;
+    
+    // Calculate extra charges total
+    const extraChargesTotal = extraCharges.reduce((sum, charge) => sum + charge.total, 0);
+    
+    // Calculate discounts total
+    const discountsTotal = discounts.reduce((sum, discount) => sum + discount.total, 0);
+    
+    // Calculate payments total
+    const paymentsTotal = payments.reduce((sum, payment) => sum + payment.payment_amount, 0);
 
-    // Calculate grand total
-    const grandTotal = totalRent + serviceCharge + workerCharge + lostPlatePenalty;
-    const finalDue = grandTotal - advancePaid;
+    // Calculate grand total and final due
+    const grandTotal = totalRent + serviceCharge + extraChargesTotal;
+    const finalDue = grandTotal - discountsTotal - advancePaid - paymentsTotal;
+    const balanceCarryForward = finalDue < 0 ? Math.abs(finalDue) : 0;
 
     return {
       client,
@@ -339,12 +360,16 @@ export class ComprehensiveBillingCalculator {
       total_rent: totalRent,
       total_plates_issued: totalPlatesIssued,
       service_charge: serviceCharge,
-      worker_charge: workerCharge,
-      lost_plates_count: lostPlatesCount,
-      lost_plate_penalty: lostPlatePenalty,
+      extra_charges: extraCharges,
+      extra_charges_total: extraChargesTotal,
+      discounts: discounts,
+      discounts_total: discountsTotal,
+      payments: payments,
+      payments_total: paymentsTotal,
       grand_total: grandTotal,
       advance_paid: advancePaid,
       final_due: finalDue,
+      balance_carry_forward: balanceCarryForward,
       rates: finalRates
     };
   }

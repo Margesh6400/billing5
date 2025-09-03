@@ -130,6 +130,89 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
         </div>
       </div>
 
+      <!-- Extra Charges Section -->
+      ${data.extra_charges.length > 0 ? `
+        <div style="margin-bottom:30px;">
+          <div style="border:2px solid #f59e0b;border-radius:8px;overflow:hidden;">
+            <div style="background:#f59e0b;color:white;padding:15px;text-align:center;">
+              <h3 style="margin:0;font-size:20px;font-weight:bold;">વધારાના ચાર્જ / EXTRA CHARGES</h3>
+            </div>
+            
+            <table style="width:100%;border-collapse:collapse;font-size:16px;">
+              <tbody>
+                ${data.extra_charges.map((charge, index) => `
+                  <tr style="background:${index % 2 === 0 ? '#fef3c7' : 'white'};">
+                    <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">${charge.note}</td>
+                    <td style="padding:15px;text-align:center;border:1px solid #e2e8f0;font-weight:bold;">${charge.item_count} × ₹${charge.price.toFixed(2)}</td>
+                    <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#f59e0b;">${formatCurrency(charge.total)}</td>
+                  </tr>
+                `).join('')}
+                
+                <tr style="background:#f59e0b;color:white;border-top:3px solid #f59e0b;">
+                  <td colspan="2" style="padding:15px;border:1px solid #f59e0b;font-size:18px;font-weight:bold;">કુલ વધારાના ચાર્જ:</td>
+                  <td style="padding:15px;text-align:right;border:1px solid #f59e0b;font-size:18px;font-weight:bold;">${formatCurrency(data.extra_charges_total)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Discounts Section -->
+      ${data.discounts.length > 0 ? `
+        <div style="margin-bottom:30px;">
+          <div style="border:2px solid #10b981;border-radius:8px;overflow:hidden;">
+            <div style="background:#10b981;color:white;padding:15px;text-align:center;">
+              <h3 style="margin:0;font-size:20px;font-weight:bold;">ડિસ્કાઉન્ટ / DISCOUNTS</h3>
+            </div>
+            
+            <table style="width:100%;border-collapse:collapse;font-size:16px;">
+              <tbody>
+                ${data.discounts.map((discount, index) => `
+                  <tr style="background:${index % 2 === 0 ? '#d1fae5' : 'white'};">
+                    <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">${discount.note}</td>
+                    <td style="padding:15px;text-align:center;border:1px solid #e2e8f0;font-weight:bold;">${discount.item_count} × ₹${discount.price.toFixed(2)}</td>
+                    <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#10b981;">${formatCurrency(discount.total)}</td>
+                  </tr>
+                `).join('')}
+                
+                <tr style="background:#10b981;color:white;border-top:3px solid #10b981;">
+                  <td colspan="2" style="padding:15px;border:1px solid #10b981;font-size:18px;font-weight:bold;">કુલ ડિસ્કાઉન્ટ:</td>
+                  <td style="padding:15px;text-align:right;border:1px solid #10b981;font-size:18px;font-weight:bold;">-${formatCurrency(data.discounts_total)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Payments Section -->
+      ${data.payments.length > 0 ? `
+        <div style="margin-bottom:30px;">
+          <div style="border:2px solid #8b5cf6;border-radius:8px;overflow:hidden;">
+            <div style="background:#8b5cf6;color:white;padding:15px;text-align:center;">
+              <h3 style="margin:0;font-size:20px;font-weight:bold;">ચુકવણી / PAYMENTS</h3>
+            </div>
+            
+            <table style="width:100%;border-collapse:collapse;font-size:16px;">
+              <tbody>
+                ${data.payments.map((payment, index) => `
+                  <tr style="background:${index % 2 === 0 ? '#ede9fe' : 'white'};">
+                    <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">${payment.note}</td>
+                    <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#8b5cf6;">${formatCurrency(payment.payment_amount)}</td>
+                  </tr>
+                `).join('')}
+                
+                <tr style="background:#8b5cf6;color:white;border-top:3px solid #8b5cf6;">
+                  <td style="padding:15px;border:1px solid #8b5cf6;font-size:18px;font-weight:bold;">કુલ ચુકવણી:</td>
+                  <td style="padding:15px;text-align:right;border:1px solid #8b5cf6;font-size:18px;font-weight:bold;">-${formatCurrency(data.payments_total)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ` : ''}
+
       <!-- Charges Breakdown -->
       <div style="margin-bottom:30px;">
         <div style="border:2px solid #059669;border-radius:8px;overflow:hidden;">
@@ -145,37 +228,38 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
                 <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">Service Charge (${data.total_plates_issued} × ₹${data.rates.service_charge_rate}):</td>
                 <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#059669;">${formatCurrency(data.service_charge)}</td>
               </tr>
-              <tr style="background:white;">
-                <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">Worker/Handling Charge / કામદાર ચાર્જ:</td>
-                <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#059669;">${formatCurrency(data.worker_charge)}</td>
-              </tr>
-              ${data.lost_plates_count > 0 ? `
-                <tr style="background:#fef2f2;">
-                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;color:#dc2626;">Lost Plates Penalty (${data.lost_plates_count} × ₹${data.rates.lost_plate_penalty}) / ગુમ પ્લેટ દંડ:</td>
-                  <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#dc2626;">${formatCurrency(data.lost_plate_penalty)}</td>
-                </tr>
-              ` : ''}
               
               <!-- Grand Total Row -->
               <tr style="background:#1e40af;color:white;border-top:3px solid #1e40af;">
-                <td style="padding:20px;border:1px solid #1e40af;font-size:20px;font-weight:bold;">Grand Total / કુલ રકમ:</td>
-                <td style="padding:20px;text-align:right;border:1px solid #1e40af;font-size:22px;font-weight:bold;">${formatCurrency(data.grand_total)}</td>
-              </tr>
               
-              ${data.advance_paid > 0 ? `
-                <tr style="background:#dcfce7;">
-                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;color:#059669;">Advance Paid / અગાઉથી ચૂકવેલ:</td>
-                  <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#059669;">-${formatCurrency(data.advance_paid)}</td>
+              ${data.extra_charges_total > 0 ? `
+                <tr style="background:#fef3c7;">
+                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;color:#f59e0b;">Extra Charges / વધારાના ચાર્જ:</td>
+                  <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#f59e0b;">+${formatCurrency(data.extra_charges_total)}</td>
+                </tr>
+              ` : ''}
+              
+              ${data.discounts_total > 0 ? `
+                <tr style="background:#d1fae5;">
+                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;color:#10b981;">Discounts / ડિસ્કાઉન્ટ:</td>
+                  <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#10b981;">-${formatCurrency(data.discounts_total)}</td>
+                </tr>
+              ` : ''}
+              
+              ${data.payments_total > 0 ? `
+                <tr style="background:#ede9fe;">
+                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;color:#8b5cf6;">Payments / ચુકવણી:</td>
+                  <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#8b5cf6;">-${formatCurrency(data.payments_total)}</td>
                 </tr>
               ` : ''}
               
               <!-- Final Due Row -->
-              <tr style="background:#${data.final_due > 0 ? 'dc2626' : '059669'};color:white;border-top:3px solid #${data.final_due > 0 ? 'dc2626' : '059669'};">
+              <tr style="background:#${data.final_due > 0 ? 'dc2626' : data.balance_carry_forward > 0 ? '10b981' : '059669'};color:white;border-top:3px solid #${data.final_due > 0 ? 'dc2626' : data.balance_carry_forward > 0 ? '10b981' : '059669'};">
                 <td style="padding:25px;border:1px solid #${data.final_due > 0 ? 'dc2626' : '059669'};font-size:24px;font-weight:bold;">
-                  ${data.final_due > 0 ? 'FINAL DUE / અંતિમ બાકી:' : 'FULLY PAID / સંપૂર્ણ ચૂકવણી:'}
+                  ${data.final_due > 0 ? 'FINAL DUE / અંતિમ બાકી:' : data.balance_carry_forward > 0 ? 'BALANCE CARRY FORWARD / બેલેન્સ આગળ વહન:' : 'FULLY PAID / સંપૂર્ણ ચૂકવણી:'}
                 </td>
-                <td style="padding:25px;text-align:right;border:1px solid #${data.final_due > 0 ? 'dc2626' : '059669'};font-size:28px;font-weight:bold;">
-                  ${data.final_due > 0 ? formatCurrency(data.final_due) : '₹0.00'}
+                <td style="padding:25px;text-align:right;border:1px solid #${data.final_due > 0 ? 'dc2626' : data.balance_carry_forward > 0 ? '10b981' : '059669'};font-size:28px;font-weight:bold;">
+                  ${data.final_due > 0 ? formatCurrency(data.final_due) : data.balance_carry_forward > 0 ? formatCurrency(data.balance_carry_forward) : '₹0.00'}
                 </td>
               </tr>
             </tbody>

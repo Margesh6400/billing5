@@ -15,12 +15,21 @@ import {
   Package,
   AlertTriangle,
   CheckCircle,
-  Lock
+  Lock,
+  Plus,
+  Minus,
+  X,
+  CreditCard,
+  Receipt,
+  Percent
 } from 'lucide-react';
 import { 
   ComprehensiveBillingCalculator, 
   ComprehensiveBillData, 
-  BillingRates 
+  BillingRates,
+  ExtraCharge,
+  Discount,
+  Payment
 } from '../../utils/comprehensiveBillingCalculator';
 import { 
   generateComprehensiveBillJPG, 
@@ -51,6 +60,11 @@ export function ComprehensiveBillManagement() {
     worker_charge: 100.00,
     lost_plate_penalty: 250.00
   });
+
+  // New sections state
+  const [extraCharges, setExtraCharges] = useState<ExtraCharge[]>([]);
+  const [discounts, setDiscounts] = useState<Discount[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   
   // Calculation results
   const [billData, setBillData] = useState<ComprehensiveBillData | null>(null);
@@ -109,7 +123,10 @@ export function ComprehensiveBillManagement() {
         returns,
         billDate,
         rates,
-        advancePaid
+        advancePaid,
+        extraCharges,
+        discounts,
+        payments
       );
 
       calculatedBill.bill_number = billNumber;
@@ -134,6 +151,9 @@ export function ComprehensiveBillManagement() {
       setSelectedClient(null);
       setBillData(null);
       setAdvancePaid(0);
+      setExtraCharges([]);
+      setDiscounts([]);
+      setPayments([]);
       await generateBillNumber();
       
       alert('બિલ સફળતાપૂર્વક જનરેટ અને ડાઉનલોડ થયું!');
@@ -147,6 +167,65 @@ export function ComprehensiveBillManagement() {
 
   const updateRate = (field: keyof BillingRates, value: number) => {
     setRates(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Extra Charges handlers
+  const addExtraCharge = () => {
+    setExtraCharges(prev => [...prev, { note: '', item_count: 1, price: 0, total: 0 }]);
+  };
+
+  const updateExtraCharge = (index: number, field: keyof ExtraCharge, value: string | number) => {
+    setExtraCharges(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      // Auto-calculate total
+      if (field === 'item_count' || field === 'price') {
+        updated[index].total = updated[index].item_count * updated[index].price;
+      }
+      return updated;
+    });
+  };
+
+  const removeExtraCharge = (index: number) => {
+    setExtraCharges(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Discounts handlers
+  const addDiscount = () => {
+    setDiscounts(prev => [...prev, { note: '', item_count: 1, price: 0, total: 0 }]);
+  };
+
+  const updateDiscount = (index: number, field: keyof Discount, value: string | number) => {
+    setDiscounts(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      // Auto-calculate total
+      if (field === 'item_count' || field === 'price') {
+        updated[index].total = updated[index].item_count * updated[index].price;
+      }
+      return updated;
+    });
+  };
+
+  const removeDiscount = (index: number) => {
+    setDiscounts(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Payments handlers
+  const addPayment = () => {
+    setPayments(prev => [...prev, { note: '', payment_amount: 0 }]);
+  };
+
+  const updatePayment = (index: number, field: keyof Payment, value: string | number) => {
+    setPayments(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const removePayment = (index: number) => {
+    setPayments(prev => prev.filter((_, i) => i !== index));
   };
 
   const filteredClients = clients.filter(client =>
@@ -331,26 +410,225 @@ export function ComprehensiveBillManagement() {
                   placeholder="0.00"
                 />
               </div>
-
-              <button
-                onClick={handleCalculateBill}
-                disabled={calculating}
-                className="flex items-center justify-center w-full gap-2 py-2 text-sm font-medium text-white transition-all duration-200 transform rounded-lg shadow-lg bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 hover:shadow-xl hover:scale-105 disabled:opacity-50"
-              >
-                {calculating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    ગણતરી કરી રહ્યા છીએ...
-                  </>
-                ) : (
-                  <>
-                    <Calculator className="w-4 h-4" />
-                    બિલ ગણતરી કરો
-                  </>
-                )}
-              </button>
             </div>
           </div>
+        )}
+
+        {/* Extra Charges Section */}
+        {selectedClient && (
+          <div className="overflow-hidden bg-white border-2 border-orange-100 shadow-lg rounded-xl">
+            <div className="p-3 bg-gradient-to-r from-orange-500 to-red-500">
+              <div className="flex items-center justify-between">
+                <h3 className="flex items-center gap-2 text-sm font-bold text-white">
+                  <Plus className="w-4 h-4" />
+                  વધારાના ચાર્જ
+                </h3>
+                <button
+                  onClick={addExtraCharge}
+                  className="p-1 text-white rounded hover:bg-white/20"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-3 space-y-2">
+              {extraCharges.length === 0 ? (
+                <p className="text-xs text-gray-500 text-center py-2">કોઈ વધારાના ચાર્જ નથી</p>
+              ) : (
+                extraCharges.map((charge, index) => (
+                  <div key={index} className="grid grid-cols-12 gap-2 items-center p-2 border border-orange-200 rounded bg-orange-50">
+                    <input
+                      type="text"
+                      placeholder="ચાર્જ વર્ણન"
+                      value={charge.note}
+                      onChange={(e) => updateExtraCharge(index, 'note', e.target.value)}
+                      className="col-span-5 px-2 py-1 text-xs border border-gray-300 rounded"
+                    />
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="સંખ્યા"
+                      value={charge.item_count}
+                      onChange={(e) => updateExtraCharge(index, 'item_count', parseInt(e.target.value) || 1)}
+                      className="col-span-2 px-2 py-1 text-xs border border-gray-300 rounded text-center"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="દર"
+                      value={charge.price}
+                      onChange={(e) => updateExtraCharge(index, 'price', parseFloat(e.target.value) || 0)}
+                      className="col-span-3 px-2 py-1 text-xs border border-gray-300 rounded text-center"
+                    />
+                    <div className="col-span-1 text-xs font-bold text-orange-700 text-center">
+                      ₹{charge.total.toFixed(2)}
+                    </div>
+                    <button
+                      onClick={() => removeExtraCharge(index)}
+                      className="col-span-1 p-1 text-red-600 hover:bg-red-100 rounded"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))
+              )}
+              {extraCharges.length > 0 && (
+                <div className="text-right text-sm font-bold text-orange-700">
+                  કુલ વધારાના ચાર્જ: ₹{extraCharges.reduce((sum, charge) => sum + charge.total, 0).toFixed(2)}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Discounts Section */}
+        {selectedClient && (
+          <div className="overflow-hidden bg-white border-2 border-green-100 shadow-lg rounded-xl">
+            <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500">
+              <div className="flex items-center justify-between">
+                <h3 className="flex items-center gap-2 text-sm font-bold text-white">
+                  <Percent className="w-4 h-4" />
+                  ડિસ્કાઉન્ટ
+                </h3>
+                <button
+                  onClick={addDiscount}
+                  className="p-1 text-white rounded hover:bg-white/20"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-3 space-y-2">
+              {discounts.length === 0 ? (
+                <p className="text-xs text-gray-500 text-center py-2">કોઈ ડિસ્કાઉન્ટ નથી</p>
+              ) : (
+                discounts.map((discount, index) => (
+                  <div key={index} className="grid grid-cols-12 gap-2 items-center p-2 border border-green-200 rounded bg-green-50">
+                    <input
+                      type="text"
+                      placeholder="ડિસ્કાઉન્ટ વર્ણન"
+                      value={discount.note}
+                      onChange={(e) => updateDiscount(index, 'note', e.target.value)}
+                      className="col-span-5 px-2 py-1 text-xs border border-gray-300 rounded"
+                    />
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="સંખ્યા"
+                      value={discount.item_count}
+                      onChange={(e) => updateDiscount(index, 'item_count', parseInt(e.target.value) || 1)}
+                      className="col-span-2 px-2 py-1 text-xs border border-gray-300 rounded text-center"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="દર"
+                      value={discount.price}
+                      onChange={(e) => updateDiscount(index, 'price', parseFloat(e.target.value) || 0)}
+                      className="col-span-3 px-2 py-1 text-xs border border-gray-300 rounded text-center"
+                    />
+                    <div className="col-span-1 text-xs font-bold text-green-700 text-center">
+                      ₹{discount.total.toFixed(2)}
+                    </div>
+                    <button
+                      onClick={() => removeDiscount(index)}
+                      className="col-span-1 p-1 text-red-600 hover:bg-red-100 rounded"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))
+              )}
+              {discounts.length > 0 && (
+                <div className="text-right text-sm font-bold text-green-700">
+                  કુલ ડિસ્કાઉન્ટ: ₹{discounts.reduce((sum, discount) => sum + discount.total, 0).toFixed(2)}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Payments Section */}
+        {selectedClient && (
+          <div className="overflow-hidden bg-white border-2 border-purple-100 shadow-lg rounded-xl">
+            <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500">
+              <div className="flex items-center justify-between">
+                <h3 className="flex items-center gap-2 text-sm font-bold text-white">
+                  <CreditCard className="w-4 h-4" />
+                  ચુકવણી
+                </h3>
+                <button
+                  onClick={addPayment}
+                  className="p-1 text-white rounded hover:bg-white/20"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-3 space-y-2">
+              {payments.length === 0 ? (
+                <p className="text-xs text-gray-500 text-center py-2">કોઈ ચુકવણી નથી</p>
+              ) : (
+                payments.map((payment, index) => (
+                  <div key={index} className="grid grid-cols-12 gap-2 items-center p-2 border border-purple-200 rounded bg-purple-50">
+                    <input
+                      type="text"
+                      placeholder="ચુકવણી વર્ણન"
+                      value={payment.note}
+                      onChange={(e) => updatePayment(index, 'note', e.target.value)}
+                      className="col-span-8 px-2 py-1 text-xs border border-gray-300 rounded"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="રકમ"
+                      value={payment.payment_amount}
+                      onChange={(e) => updatePayment(index, 'payment_amount', parseFloat(e.target.value) || 0)}
+                      className="col-span-3 px-2 py-1 text-xs border border-gray-300 rounded text-center"
+                    />
+                    <button
+                      onClick={() => removePayment(index)}
+                      className="col-span-1 p-1 text-red-600 hover:bg-red-100 rounded"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))
+              )}
+              {payments.length > 0 && (
+                <div className="text-right text-sm font-bold text-purple-700">
+                  કુલ ચુકવણી: ₹{payments.reduce((sum, payment) => sum + payment.payment_amount, 0).toFixed(2)}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Calculate Button */}
+        {selectedClient && (
+          <button
+            onClick={handleCalculateBill}
+            disabled={calculating}
+            className="flex items-center justify-center w-full gap-2 py-2 text-sm font-medium text-white transition-all duration-200 transform rounded-lg shadow-lg bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 hover:shadow-xl hover:scale-105 disabled:opacity-50"
+          >
+            {calculating ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                ગણતરી કરી રહ્યા છીએ...
+              </>
+            ) : (
+              <>
+                <Calculator className="w-4 h-4" />
+                બિલ ગણતરી કરો
+              </>
+            )}
+          </button>
         )}
 
         {/* Billing Rates Configuration */}
@@ -471,9 +749,10 @@ export function ComprehensiveBillManagement() {
                 </table>
               </div>
 
-              {/* Charges Summary */}
+              {/* Enhanced Charges Summary */}
               <div className="p-3 border border-gray-200 rounded bg-gray-50">
                 <div className="space-y-2 text-xs">
+                  {/* Original Charges */}
                   <div className="flex justify-between">
                     <span>Subtotal Rent:</span>
                     <span className="font-bold">₹{billData.total_rent.toFixed(2)}</span>
@@ -492,22 +771,55 @@ export function ComprehensiveBillManagement() {
                       <span className="font-bold">₹{billData.lost_plate_penalty.toFixed(2)}</span>
                     </div>
                   )}
+                  
+                  {/* Extra Charges */}
+                  {billData.extra_charges_total > 0 && (
+                    <div className="flex justify-between text-orange-600">
+                      <span>Extra Charges:</span>
+                      <span className="font-bold">₹{billData.extra_charges_total.toFixed(2)}</span>
+                    </div>
+                  )}
+                  
                   <hr className="border-gray-300" />
                   <div className="flex justify-between text-lg font-bold">
-                    <span>Grand Total:</span>
-                    <span>₹{billData.grand_total.toFixed(2)}</span>
+                    <span>Subtotal:</span>
+                    <span>₹{billData.subtotal.toFixed(2)}</span>
                   </div>
-                  {billData.advance_paid > 0 && (
+                  
+                  {/* Deductions */}
+                  {billData.discounts_total > 0 && (
                     <div className="flex justify-between text-green-600">
+                      <span>Discounts:</span>
+                      <span className="font-bold">-₹{billData.discounts_total.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {billData.advance_paid > 0 && (
+                    <div className="flex justify-between text-blue-600">
                       <span>Advance Paid:</span>
                       <span className="font-bold">-₹{billData.advance_paid.toFixed(2)}</span>
                     </div>
                   )}
+                  {billData.payments_total > 0 && (
+                    <div className="flex justify-between text-purple-600">
+                      <span>Payments:</span>
+                      <span className="font-bold">-₹{billData.payments_total.toFixed(2)}</span>
+                    </div>
+                  )}
+                  
                   <hr className="border-gray-300" />
-                  <div className={`flex justify-between text-xl font-bold ${billData.final_due > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    <span>FINAL DUE:</span>
-                    <span>₹{billData.final_due.toFixed(2)}</span>
-                  </div>
+                  
+                  {/* Final Result */}
+                  {billData.balance_carry_forward > 0 ? (
+                    <div className="flex justify-between text-xl font-bold text-green-600">
+                      <span>BALANCE CARRY FORWARD:</span>
+                      <span>₹{billData.balance_carry_forward.toFixed(2)}</span>
+                    </div>
+                  ) : (
+                    <div className={`flex justify-between text-xl font-bold ${billData.final_due > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      <span>FINAL DUE:</span>
+                      <span>₹{billData.final_due.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

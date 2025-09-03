@@ -31,6 +31,25 @@ export interface BillingRates {
   lost_plate_penalty: number;   // ₹250 by default
 }
 
+export interface ExtraCharge {
+  note: string;
+  item_count: number;
+  price: number;
+  total: number; // Auto-calculated: item_count × price
+}
+
+export interface Discount {
+  note: string;
+  item_count: number;
+  price: number;
+  total: number; // Auto-calculated: item_count × price
+}
+
+export interface Payment {
+  note: string;
+  payment_amount: number;
+}
+
 export interface ComprehensiveBillData {
   client: Client;
   bill_number: string;
@@ -38,16 +57,31 @@ export interface ComprehensiveBillData {
   ledger_entries: LedgerEntry[];
   date_ranges: DateRangeBilling[];
   
-  // Calculations
+  // Original calculations
   total_rent: number;
   total_plates_issued: number;
   service_charge: number;
   worker_charge: number;
   lost_plates_count: number;
   lost_plate_penalty: number;
+  
+  // New sections
+  extra_charges: ExtraCharge[];
+  discounts: Discount[];
+  payments: Payment[];
+  
+  // Totals
+  extra_charges_total: number;
+  discounts_total: number;
+  payments_total: number;
+  
+  // Final calculations
+  subtotal: number; // Rent + Service + Worker + Extra Charges
+  total_deductions: number; // Discounts + Advance + Payments
   grand_total: number;
   advance_paid: number;
   final_due: number;
+  balance_carry_forward: number; // If overpaid
   
   // Rates used
   rates: BillingRates;
@@ -126,7 +160,10 @@ export class ComprehensiveBillingCalculator {
     returns: any[],
     billDate: string,
     rates: Partial<BillingRates> = {},
-    advancePaid: number = 0
+    advancePaid: number = 0,
+    extraCharges: ExtraCharge[] = [],
+    discounts: Discount[] = [],
+    payments: Payment[] = []
   ): ComprehensiveBillData {
     const finalRates = { ...this.defaultRates, ...rates };
 
@@ -215,7 +252,7 @@ export class ComprehensiveBillingCalculator {
       });
     }
 
-    // Step 3: Calculate totals
+    // Step 3: Calculate original totals
     const totalRent = dateRanges.reduce((sum, range) => sum + range.rent_amount, 0);
     
     // Calculate total plates issued (for service charge)
@@ -235,14 +272,22 @@ export class ComprehensiveBillingCalculator {
     // Calculate lost plates
     const lostPlatesCount = Math.max(0, totalPlatesIssued - totalPlatesReturned);
 
-    // Calculate charges
+    // Calculate original charges
     const serviceCharge = totalPlatesIssued * finalRates.service_charge_rate;
     const workerCharge = finalRates.worker_charge;
     const lostPlatePenalty = lostPlatesCount * finalRates.lost_plate_penalty;
 
-    // Calculate grand total
-    const grandTotal = totalRent + serviceCharge + workerCharge + lostPlatePenalty;
-    const finalDue = grandTotal - advancePaid;
+    // Step 4: Calculate new sections totals
+    const extraChargesTotal = extraCharges.reduce((sum, charge) => sum + charge.total, 0);
+    const discountsTotal = discounts.reduce((sum, discount) => sum + discount.total, 0);
+    const paymentsTotal = payments.reduce((sum, payment) => sum + payment.payment_amount, 0);
+
+    // Step 5: Calculate final totals with new formula
+    const subtotal = totalRent + serviceCharge + workerCharge + lostPlatePenalty + extraChargesTotal;
+    const totalDeductions = discountsTotal + advancePaid + paymentsTotal;
+    const grandTotal = subtotal;
+    const finalDue = Math.max(0, grandTotal - totalDeductions);
+    const balanceCarryForward = totalDeductions > grandTotal ? totalDeductions - grandTotal : 0;
 
     return {
       client,
@@ -256,9 +301,24 @@ export class ComprehensiveBillingCalculator {
       worker_charge: workerCharge,
       lost_plates_count: lostPlatesCount,
       lost_plate_penalty: lostPlatePenalty,
+      
+      // New sections
+      extra_charges: extraCharges,
+      discounts: discounts,
+      payments: payments,
+      
+      // New totals
+      extra_charges_total: extraChargesTotal,
+      discounts_total: discountsTotal,
+      payments_total: paymentsTotal,
+      
+      // Final calculations
+      subtotal: subtotal,
+      total_deductions: totalDeductions,
       grand_total: grandTotal,
       advance_paid: advancePaid,
       final_due: finalDue,
+      balance_carry_forward: balanceCarryForward,
       rates: finalRates
     };
   }
@@ -300,5 +360,31 @@ export class ComprehensiveBillingCalculator {
     const end = new Date(endDate);
     const diffTime = Math.abs(end.getTime() - start.getTime());
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  }
+
+  // Helper methods for new sections
+  createExtraCharge(note: string, itemCount: number, price: number): ExtraCharge {
+    return {
+      note,
+      item_count: itemCount,
+      price,
+      total: itemCount * price
+    };
+  }
+
+  createDiscount(note: string, itemCount: number, price: number): Discount {
+    return {
+      note,
+      item_count: itemCount,
+      price,
+      total: itemCount * price
+    };
+  }
+
+  createPayment(note: string, paymentAmount: number): Payment {
+    return {
+      note,
+      payment_amount: paymentAmount
+    };
   }
 }

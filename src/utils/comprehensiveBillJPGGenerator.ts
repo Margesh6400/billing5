@@ -121,28 +121,181 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
                 </tr>
               ` : ''}
               
-              <!-- Grand Total Row -->
+              ${data.extra_charges_total > 0 ? `
+                <tr style="background:#fff7ed;">
+                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;color:#ea580c;">Extra Charges / વધારાના ચાર્જ:</td>
+                  <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#ea580c;">${formatCurrency(data.extra_charges_total)}</td>
+                </tr>
+              ` : ''}
+              
+              <!-- Subtotal Row -->
               <tr style="background:#1e40af;color:white;border-top:3px solid #1e40af;">
-                <td style="padding:20px;border:1px solid #1e40af;font-size:20px;font-weight:bold;">Grand Total / કુલ રકમ:</td>
-                <td style="padding:20px;text-align:right;border:1px solid #1e40af;font-size:22px;font-weight:bold;">${formatCurrency(data.grand_total)}</td>
+                <td style="padding:20px;border:1px solid #1e40af;font-size:20px;font-weight:bold;">Subtotal / પેટા કુલ:</td>
+                <td style="padding:20px;text-align:right;border:1px solid #1e40af;font-size:22px;font-weight:bold;">${formatCurrency(data.subtotal)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      ${data.extra_charges.length > 0 ? `
+        <!-- Extra Charges Detail -->
+        <div style="margin-bottom:25px;">
+          <div style="border:2px solid #ea580c;border-radius:8px;overflow:hidden;">
+            <div style="background:#ea580c;color:white;padding:12px;text-align:center;">
+              <h3 style="margin:0;font-size:18px;font-weight:bold;">વધારાના ચાર્જ</h3>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:14px;">
+              <thead>
+                <tr style="background:#fff7ed;">
+                  <th style="padding:10px;text-align:left;border:1px solid #fed7aa;font-weight:bold;">વર્ણન</th>
+                  <th style="padding:10px;text-align:center;border:1px solid #fed7aa;font-weight:bold;">સંખ્યા</th>
+                  <th style="padding:10px;text-align:center;border:1px solid #fed7aa;font-weight:bold;">દર (₹)</th>
+                  <th style="padding:10px;text-align:right;border:1px solid #fed7aa;font-weight:bold;">કુલ (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.extra_charges.map((charge, index) => `
+                  <tr style="background:${index % 2 === 0 ? '#fffbeb' : 'white'};">
+                    <td style="padding:10px;border:1px solid #fed7aa;">${charge.note}</td>
+                    <td style="padding:10px;text-align:center;border:1px solid #fed7aa;font-weight:bold;">${charge.item_count}</td>
+                    <td style="padding:10px;text-align:center;border:1px solid #fed7aa;font-weight:bold;">₹${charge.price.toFixed(2)}</td>
+                    <td style="padding:10px;text-align:right;border:1px solid #fed7aa;font-weight:bold;color:#ea580c;">₹${charge.total.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+                <tr style="background:#ea580c;color:white;">
+                  <td colspan="3" style="padding:12px;text-align:right;border:1px solid #ea580c;font-weight:bold;">કુલ વધારાના ચાર્જ:</td>
+                  <td style="padding:12px;text-align:right;border:1px solid #ea580c;font-weight:bold;">₹${data.extra_charges_total.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ` : ''}
+
+      ${data.discounts.length > 0 ? `
+        <!-- Discounts Detail -->
+        <div style="margin-bottom:25px;">
+          <div style="border:2px solid #059669;border-radius:8px;overflow:hidden;">
+            <div style="background:#059669;color:white;padding:12px;text-align:center;">
+              <h3 style="margin:0;font-size:18px;font-weight:bold;">ડિસ્કાઉન્ટ</h3>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:14px;">
+              <thead>
+                <tr style="background:#f0fdf4;">
+                  <th style="padding:10px;text-align:left;border:1px solid #bbf7d0;font-weight:bold;">વર્ણન</th>
+                  <th style="padding:10px;text-align:center;border:1px solid #bbf7d0;font-weight:bold;">સંખ્યા</th>
+                  <th style="padding:10px;text-align:center;border:1px solid #bbf7d0;font-weight:bold;">દર (₹)</th>
+                  <th style="padding:10px;text-align:right;border:1px solid #bbf7d0;font-weight:bold;">કુલ (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.discounts.map((discount, index) => `
+                  <tr style="background:${index % 2 === 0 ? '#f0fdf4' : 'white'};">
+                    <td style="padding:10px;border:1px solid #bbf7d0;">${discount.note}</td>
+                    <td style="padding:10px;text-align:center;border:1px solid #bbf7d0;font-weight:bold;">${discount.item_count}</td>
+                    <td style="padding:10px;text-align:center;border:1px solid #bbf7d0;font-weight:bold;">₹${discount.price.toFixed(2)}</td>
+                    <td style="padding:10px;text-align:right;border:1px solid #bbf7d0;font-weight:bold;color:#059669;">₹${discount.total.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+                <tr style="background:#059669;color:white;">
+                  <td colspan="3" style="padding:12px;text-align:right;border:1px solid #059669;font-weight:bold;">કુલ ડિસ્કાઉન્ટ:</td>
+                  <td style="padding:12px;text-align:right;border:1px solid #059669;font-weight:bold;">₹${data.discounts_total.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ` : ''}
+
+      ${data.payments.length > 0 ? `
+        <!-- Payments Detail -->
+        <div style="margin-bottom:25px;">
+          <div style="border:2px solid #7c3aed;border-radius:8px;overflow:hidden;">
+            <div style="background:#7c3aed;color:white;padding:12px;text-align:center;">
+              <h3 style="margin:0;font-size:18px;font-weight:bold;">ચુકવણી</h3>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:14px;">
+              <thead>
+                <tr style="background:#f5f3ff;">
+                  <th style="padding:10px;text-align:left;border:1px solid #c4b5fd;font-weight:bold;">વર્ણન</th>
+                  <th style="padding:10px;text-align:right;border:1px solid #c4b5fd;font-weight:bold;">રકમ (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.payments.map((payment, index) => `
+                  <tr style="background:${index % 2 === 0 ? '#f5f3ff' : 'white'};">
+                    <td style="padding:10px;border:1px solid #c4b5fd;">${payment.note}</td>
+                    <td style="padding:10px;text-align:right;border:1px solid #c4b5fd;font-weight:bold;color:#7c3aed;">₹${payment.payment_amount.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+                <tr style="background:#7c3aed;color:white;">
+                  <td style="padding:12px;text-align:right;border:1px solid #7c3aed;font-weight:bold;">કુલ ચુકવણી:</td>
+                  <td style="padding:12px;text-align:right;border:1px solid #7c3aed;font-weight:bold;">₹${data.payments_total.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Final Calculation -->
+      <div style="margin-bottom:30px;">
+        <div style="border:3px solid #${data.balance_carry_forward > 0 ? '059669' : data.final_due > 0 ? 'dc2626' : '059669'};border-radius:8px;overflow:hidden;">
+          <!-- Final Header -->
+          <div style="background:#${data.balance_carry_forward > 0 ? '059669' : data.final_due > 0 ? 'dc2626' : '059669'};color:white;padding:15px;text-align:center;">
+            <h3 style="margin:0;font-size:22px;font-weight:bold;">FINAL CALCULATION / અંતિમ ગણતરી</h3>
+          </div>
+          
+          <!-- Final Table -->
+          <table style="width:100%;border-collapse:collapse;font-size:16px;">
+            <tbody>
+              <tr style="background:#f8fafc;">
+                <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">Subtotal (Rent + Service + Worker + Extra):</td>
+                <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;">${formatCurrency(data.subtotal)}</td>
               </tr>
               
+              ${data.discounts_total > 0 ? `
+                <tr style="background:#f0fdf4;">
+                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;color:#059669;">Less: Discounts / ઓછું: ડિસ્કાઉન્ટ:</td>
+                  <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#059669;">-${formatCurrency(data.discounts_total)}</td>
+                </tr>
+              ` : ''}
+              
               ${data.advance_paid > 0 ? `
-                <tr style="background:#dcfce7;">
-                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;color:#059669;">Advance Paid / અગાઉથી ચૂકવેલ:</td>
-                  <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#059669;">-${formatCurrency(data.advance_paid)}</td>
+                <tr style="background:#eff6ff;">
+                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;color:#2563eb;">Less: Advance Paid / ઓછું: અગાઉથી ચૂકવેલ:</td>
+                  <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#2563eb;">-${formatCurrency(data.advance_paid)}</td>
+                </tr>
+              ` : ''}
+              
+              ${data.payments_total > 0 ? `
+                <tr style="background:#f5f3ff;">
+                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;color:#7c3aed;">Less: Payments / ઓછું: ચુકવણી:</td>
+                  <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#7c3aed;">-${formatCurrency(data.payments_total)}</td>
                 </tr>
               ` : ''}
               
               <!-- Final Due Row -->
-              <tr style="background:#${data.final_due > 0 ? 'dc2626' : '059669'};color:white;border-top:3px solid #${data.final_due > 0 ? 'dc2626' : '059669'};">
-                <td style="padding:25px;border:1px solid #${data.final_due > 0 ? 'dc2626' : '059669'};font-size:24px;font-weight:bold;">
-                  ${data.final_due > 0 ? 'FINAL DUE / અંતિમ બાકી:' : 'FULLY PAID / સંપૂર્ણ ચૂકવણી:'}
-                </td>
-                <td style="padding:25px;text-align:right;border:1px solid #${data.final_due > 0 ? 'dc2626' : '059669'};font-size:28px;font-weight:bold;">
-                  ${data.final_due > 0 ? formatCurrency(data.final_due) : '₹0.00'}
-                </td>
-              </tr>
+              ${data.balance_carry_forward > 0 ? `
+                <tr style="background:#059669;color:white;border-top:3px solid #059669;">
+                  <td style="padding:25px;border:1px solid #059669;font-size:24px;font-weight:bold;">
+                    BALANCE CARRY FORWARD / બેલેન્સ આગળ વહન:
+                  </td>
+                  <td style="padding:25px;text-align:right;border:1px solid #059669;font-size:28px;font-weight:bold;">
+                    ${formatCurrency(data.balance_carry_forward)}
+                  </td>
+                </tr>
+              ` : `
+                <tr style="background:#${data.final_due > 0 ? 'dc2626' : '059669'};color:white;border-top:3px solid #${data.final_due > 0 ? 'dc2626' : '059669'};">
+                  <td style="padding:25px;border:1px solid #${data.final_due > 0 ? 'dc2626' : '059669'};font-size:24px;font-weight:bold;">
+                    ${data.final_due > 0 ? 'FINAL DUE / અંતિમ બાકી:' : 'FULLY PAID / સંપૂર્ણ ચૂકવણી:'}
+                  </td>
+                  <td style="padding:25px;text-align:right;border:1px solid #${data.final_due > 0 ? 'dc2626' : '059669'};font-size:28px;font-weight:bold;">
+                    ${data.final_due > 0 ? formatCurrency(data.final_due) : '₹0.00'}
+                  </td>
+                </tr>
+              `}
             </tbody>
           </table>
         </div>
@@ -155,7 +308,7 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
           સુરેશભાઈ પોલરા: +91 93287 28228 | હરેશભાઈ પોલરા: +91 90992 64436
         </div>
         <div style="font-size:14px;color:#999;margin-top:15px;">
-        Generated: ${new Date().toLocaleString('en-IN')} | NO WERE TECH Comprehensive Billing System
+        Generated: ${new Date().toLocaleString('en-IN')} | NO WERE TECH Enhanced Billing System
         </div>
         </div>
       </div>

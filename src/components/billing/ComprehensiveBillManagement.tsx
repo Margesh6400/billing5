@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { EnhancedGujaratiBillManagement } from './EnhancedGujaratiBillManagement';
+import { supabase } from '../../lib/supabase';
 import { Database } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { 
@@ -30,7 +30,7 @@ import {
 type Client = Database['public']['Tables']['clients']['Row'];
 
 export function ComprehensiveBillManagement() {
-  return <EnhancedGujaratiBillManagement />;
+  const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -438,56 +438,6 @@ export function ComprehensiveBillManagement() {
             <div className="p-3 space-y-3">
               {/* Date Range Breakdown */}
               <div className="overflow-x-auto">
-                {/* Ledger Entries Table with પ્લેટ્સ Column */}
-                <div className="mb-4">
-                  <h4 className="flex items-center gap-2 mb-2 text-sm font-bold text-purple-800">
-                    <Package className="w-4 h-4" />
-                    Transaction Ledger / વ્યવહાર ખાતાવહી
-                  </h4>
-                  <div className="p-2 mb-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded">
-                    <strong>Rule:</strong> જમા આગલા દિવસથી અસરકારક (Jama effective from next day)
-                  </div>
-                  <table className="w-full text-xs border border-gray-200 rounded">
-                    <thead>
-                      <tr className="text-white bg-gradient-to-r from-purple-500 to-violet-500">
-                        <th className="px-2 py-1 text-left">Date</th>
-                        <th className="px-2 py-1 text-center">પ્લેટ્સ</th>
-                        <th className="px-2 py-1 text-center">Udhar</th>
-                        <th className="px-2 py-1 text-center">Jama</th>
-                        <th className="px-2 py-1 text-center">Balance</th>
-                        <th className="px-2 py-1 text-left">Challan</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {billData.ledger_entries.map((entry, index) => (
-                        <tr key={index} className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} ${
-                          entry.entry_type === 'udhar' ? 'border-l-2 border-red-300' : 'border-l-2 border-green-300'
-                        }`}>
-                          <td className="px-2 py-1 font-medium">
-                            {new Date(entry.date).toLocaleDateString('en-GB')}
-                          </td>
-                          <td className="px-2 py-1 font-bold text-center text-gray-600">
-                            {entry.plates_before}
-                          </td>
-                          <td className="px-2 py-1 font-bold text-center text-red-600">
-                            {entry.udhar > 0 ? entry.udhar : '-'}
-                          </td>
-                          <td className="px-2 py-1 font-bold text-center text-green-600">
-                            {entry.jama > 0 ? entry.jama : '-'}
-                          </td>
-                          <td className="px-2 py-1 font-bold text-center text-blue-600">
-                            {entry.balance_after}
-                          </td>
-                          <td className="px-2 py-1 text-xs text-gray-500">
-                            #{entry.challan_number}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Date Range Billing Table */}
                 <table className="w-full text-xs border border-gray-200 rounded">
                   <thead>
                     <tr className="text-white bg-gradient-to-r from-blue-500 to-indigo-500">

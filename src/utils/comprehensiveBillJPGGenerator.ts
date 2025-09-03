@@ -57,47 +57,12 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
         </div>
       </div>
 
-      <!-- Ledger Entries Table with પ્લેટ્સ Column -->
-      <div style="margin-bottom:30px;">
-        <div style="border:2px solid #7c3aed;border-radius:8px;overflow:hidden;">
-          <div style="background:#7c3aed;color:white;padding:15px;text-align:center;">
-            <h3 style="margin:0;font-size:20px;font-weight:bold;">TRANSACTION LEDGER / વ્યવહાર ખાતાવહી</h3>
-            <p style="margin:5px 0 0 0;font-size:12px;opacity:0.9;">જમા આગલા દિવસથી અસરકારક / Jama effective from next day</p>
-          </div>
-          
-          <table style="width:100%;border-collapse:collapse;font-size:14px;">
-            <thead>
-              <tr style="background:#f3f4f6;">
-                <th style="padding:12px;text-align:left;border:1px solid #e5e7eb;font-weight:bold;">Date / તારીખ</th>
-                <th style="padding:12px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;">પ્લેટ્સ</th>
-                <th style="padding:12px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;">Udhar / ઉધાર</th>
-                <th style="padding:12px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;">Jama / જમા</th>
-                <th style="padding:12px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;">Balance / બેલેન્સ</th>
-                <th style="padding:12px;text-align:left;border:1px solid #e5e7eb;font-weight:bold;">Challan No.</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${data.ledger_entries.map((entry, index) => `
-                <tr style="background:${index % 2 === 0 ? '#f9fafb' : 'white'};">
-                  <td style="padding:10px;border:1px solid #e5e7eb;font-weight:600;">${formatDate(entry.date)}</td>
-                  <td style="padding:10px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;color:#6b7280;">${entry.plates_before}</td>
-                  <td style="padding:10px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;color:${entry.udhar > 0 ? '#dc2626' : '#9ca3af'};">${entry.udhar > 0 ? entry.udhar : '-'}</td>
-                  <td style="padding:10px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;color:${entry.jama > 0 ? '#059669' : '#9ca3af'};">${entry.jama > 0 ? entry.jama : '-'}</td>
-                  <td style="padding:10px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;color:#1e40af;">${entry.balance_after}</td>
-                  <td style="padding:10px;border:1px solid #e5e7eb;font-size:12px;color:#6b7280;">#${entry.challan_number}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
       <!-- Date Range Billing Table (Handwritten Format) -->
       <div style="margin-bottom:30px;">
         <div style="border:2px solid #1e40af;border-radius:8px;overflow:hidden;">
           <!-- Table Header -->
           <div style="background:#1e40af;color:white;padding:15px;text-align:center;">
             <h3 style="margin:0;font-size:20px;font-weight:bold;">RENT CALCULATION / ભાડા ગણતરી</h3>
-            <p style="margin:5px 0 0 0;font-size:12px;opacity:0.9;">Effective Date Based Billing / અસરકારક તારીખ આધારિત બિલિંગ</p>
           </div>
           
           <!-- Billing Table -->
@@ -183,15 +148,6 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
         </div>
       </div>
 
-      <!-- Billing Rules Explanation -->
-      <div style="margin-bottom:20px;background:#fef3c7;padding:15px;border-radius:8px;border-left:4px solid #f59e0b;">
-        <h4 style="margin:0 0 10px 0;font-size:16px;color:#92400e;font-weight:bold;">Billing Rules / બિલિંગ નિયમો:</h4>
-        <ul style="margin:0;padding-left:20px;font-size:14px;color:#92400e;">
-          <li>ઉધાર (Udhar): Same day effective / તે જ દિવસે અસરકારક</li>
-          <li>જમા (Jama): Next day effective / આગલા દિવસે અસરકારક</li>
-          <li>Rate: ₹${data.rates.daily_rent_rate}/plate/day</li>
-        </ul>
-      </div>
       <!-- Footer -->
       <div style="margin-top:40px;text-align:center;border-top:3px solid #1e40af;padding-top:25px;">
         <div style="font-size:28px;font-weight:bold;color:#1e40af;margin-bottom:15px;">આભાર! ફરી મળીએ.</div>

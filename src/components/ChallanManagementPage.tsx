@@ -5,13 +5,9 @@ import {
   Download, 
   Eye, 
   Search, 
-  ChevronDown, 
-  ChevronUp, 
-  Calendar, 
   User, 
   Hash, 
   FileText, 
-  RotateCcw, 
   Edit, 
   Save, 
   X, 
@@ -20,7 +16,6 @@ import {
   Lock,
   ArrowLeft,
   Package,
-  Plus,
   MapPin,
   Phone,
   Loader2,
@@ -106,16 +101,16 @@ interface ClientLedger {
   }>;
 }
 
-interface EditingChallan {
-  id: number;
-  type: 'udhar' | 'jama';
-  challan_number: string;
+// COMPLETELY NEW APPROACH - Simple Edit State
+interface EditState {
+  isOpen: boolean;
+  transactionId: number | null;
+  transactionType: 'udhar' | 'jama' | null;
+  challanNumber: string;
   date: string;
-  client_id: string;
-  plates: Record<string, number>;
-  borrowedStock: Record<string, number>;
-  notes: Record<string, string>;
-  driver_name: string;
+  clientId: string;
+  driverName: string;
+  plateData: Record<string, { quantity: number; borrowedStock: number; notes: string }>;
 }
 
 interface StockValidation {
@@ -134,16 +129,35 @@ export function ChallanManagementPage() {
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<number | null>(null);
   const [challanData, setChallanData] = useState<ChallanData | null>(null);
-  const [editingChallan, setEditingChallan] = useState<EditingChallan | null>(null);
-  const [editLoading, setEditLoading] = useState(false);
   const [stockData, setStockData] = useState<Stock[]>([]);
   const [stockValidation, setStockValidation] = useState<StockValidation[]>([]);
   const [previousDrivers, setPreviousDrivers] = useState<string[]>([]);
 
+  // NEW SIMPLE EDIT STATE
+  const [editState, setEditState] = useState<EditState>({
+    isOpen: false,
+    transactionId: null,
+    transactionType: null,
+    challanNumber: '',
+    date: '',
+    clientId: '',
+    driverName: '',
+    plateData: {}
+  });
+  const [editLoading, setEditLoading] = useState(false);
+
   useEffect(() => {
-    fetchClients();
-    fetchStockData();
-    fetchPreviousDriverNames();
+    console.log('Initial useEffect running');
+    const loadData = async () => {
+      console.log('Starting data fetch');
+      await Promise.all([
+        fetchClients(),
+        fetchStockData(),
+        fetchPreviousDriverNames()
+      ]);
+      console.log('Data fetch complete');
+    };
+    loadData();
   }, []);
 
   const fetchStockData = async () => {
@@ -208,7 +222,6 @@ export function ChallanManagementPage() {
     try {
       setLoading(true);
       
-      // Fetch all challans and returns for this client
       const [challansResponse, returnsResponse] = await Promise.all([
         supabase
           .from('challans')
@@ -228,7 +241,6 @@ export function ChallanManagementPage() {
       const { data: challans } = challansResponse;
       const { data: returns } = returnsResponse;
 
-      // Transform data
       const transformedUdharData = challans?.map(challan => ({
         id: challan.id,
         challan_number: challan.challan_number,
@@ -256,16 +268,15 @@ export function ChallanManagementPage() {
         driver_name: returnRecord.driver_name
       })) || [];
 
-      // Calculate outstanding
+      // Totals for outstanding should consider own quantities only (borrowed/returned)
       const totalBorrowed = transformedUdharData.reduce((sum, challan) => 
         sum + challan.challan_items.reduce((itemSum, item) => 
-          itemSum + item.borrowed_quantity + (item.borrowed_stock || 0), 0), 0);
+          itemSum + (item.borrowed_quantity || 0), 0), 0);
       const totalReturned = transformedJamaData.reduce((sum, returnRecord) => 
         sum + returnRecord.return_line_items.reduce((itemSum, item) => 
-          itemSum + item.returned_quantity + (item.returned_borrowed_stock || 0), 0), 0);
+          itemSum + (item.returned_quantity || 0), 0), 0);
       const total_outstanding = totalBorrowed - totalReturned;
 
-      // Create all transactions array
       const allTransactions = [
         ...transformedUdharData.map(challan => ({
           type: 'udhar' as const,
@@ -315,193 +326,357 @@ export function ChallanManagementPage() {
   const handleClientSelect = (client: Client) => {
     setSelectedClient(client);
     setExpandedClient(null);
-    setEditingChallan(null);
+    closeEditModal();
     fetchClientLedger(client);
   };
 
-  const handleEditChallan = async (transaction: any) => {
+  // COMPLETELY NEW APPROACH - Simple Functions
+  const openEditModal = async (transactionId: number, transactionType: 'udhar' | 'jama') => {
+    console.log('🚀 Opening edit modal:', { transactionId, transactionType });
+    
+    if (!user?.isAdmin) {
+      alert('આ કામગીરી માટે એડમિન અધિકાર જરૂરી છે.');
+      return;
+    }
+
     try {
-      if (transaction.type === 'udhar') {
-        const { data, error } = await supabase
+      let data: any;
+      let error: any;
+
+      if (transactionType === 'udhar') {
+        const response = await supabase
           .from('challans')
-          .select(`*, challan_items(*)`)
-          .eq('id', transaction.id)
+          .select('*, challan_items(*)')
+          .eq('id', transactionId)
           .single();
+        data = response.data;
+        error = response.error;
+      } else {
+        const response = await supabase
+          .from('returns')
+          .select('*, return_line_items(*)')
+          .eq('id', transactionId)
+          .single();
+        data = response.data;
+        error = response.error;
+      }
 
-        if (error) throw error;
+      if (error) throw error;
 
-        const plates: Record<string, number> = {};
-        const borrowedStock: Record<string, number> = {};
-        const notes: Record<string, string> = {};
-        
-        (data.challan_items as ChallanItem[]).forEach((item: ChallanItem) => {
-          plates[item.plate_size] = item.borrowed_quantity;
-          borrowedStock[item.plate_size] = item.borrowed_stock || 0;
-          notes[item.plate_size] = item.partner_stock_notes || '';
-        });
+      // Initialize plate data
+      const plateData: Record<string, { quantity: number; borrowedStock: number; notes: string }> = {};
+      PLATE_SIZES.forEach(size => {
+        plateData[size] = { quantity: 0, borrowedStock: 0, notes: '' };
+      });
 
-        setEditingChallan({
-          id: transaction.id,
-          type: 'udhar',
-          challan_number: data.challan_number,
-          date: data.challan_date,
-          client_id: data.client_id,
-          plates,
-          borrowedStock,
-          notes,
-          driver_name: data.driver_name || ''
+      // Fill with actual data
+      if (transactionType === 'udhar') {
+        (data.challan_items as ChallanItem[]).forEach(item => {
+          plateData[item.plate_size] = {
+            quantity: item.borrowed_quantity,
+            borrowedStock: item.borrowed_stock || 0,
+            notes: item.partner_stock_notes || ''
+          };
         });
       } else {
-        const { data, error } = await supabase
-          .from('returns')
-          .select(`*, return_line_items(*)`)
-          .eq('id', transaction.id)
-          .single();
-
-        if (error) throw error;
-
-        const plates: Record<string, number> = {};
-        const borrowedStock: Record<string, number> = {};
-        const notes: Record<string, string> = {};
-        
-        (data.return_line_items as ReturnLineItem[]).forEach((item: ReturnLineItem) => {
-          plates[item.plate_size] = item.returned_quantity;
-          borrowedStock[item.plate_size] = item.returned_borrowed_stock || 0;
-          notes[item.plate_size] = item.damage_notes || '';
-        });
-
-        setEditingChallan({
-          id: transaction.id,
-          type: 'jama',
-          challan_number: data.return_challan_number,
-          date: data.return_date,
-          client_id: data.client_id,
-          plates,
-          borrowedStock,
-          notes,
-          driver_name: data.driver_name || ''
+        (data.return_line_items as ReturnLineItem[]).forEach(item => {
+          plateData[item.plate_size] = {
+            quantity: item.returned_quantity,
+            borrowedStock: item.returned_borrowed_stock || 0,
+            notes: item.damage_notes || ''
+          };
         });
       }
+
+      setEditState({
+        isOpen: true,
+        transactionId,
+        transactionType,
+        challanNumber: transactionType === 'udhar' ? data.challan_number : data.return_challan_number,
+        date: transactionType === 'udhar' ? data.challan_date : data.return_date,
+        clientId: data.client_id,
+        driverName: data.driver_name || '',
+        plateData
+      });
+
+      console.log('✅ Edit modal opened successfully');
+
     } catch (error) {
-      console.error('Error fetching challan details:', error);
+      console.error('❌ Error opening edit modal:', error);
       alert('ચલણ વિગતો લોડ કરવામાં ભૂલ.');
     }
   };
 
+  const closeEditModal = () => {
+    setEditState({
+      isOpen: false,
+      transactionId: null,
+      transactionType: null,
+      challanNumber: '',
+      date: '',
+      clientId: '',
+      driverName: '',
+      plateData: {}
+    });
+    setStockValidation([]);
+  };
+
+  const updateEditField = (field: keyof EditState, value: any) => {
+    setEditState(prev => ({ ...prev, [field]: value }));
+  };
+
+  const updatePlateData = (size: string, field: 'quantity' | 'borrowedStock' | 'notes', value: any) => {
+    setEditState(prev => ({
+      ...prev,
+      plateData: {
+        ...prev.plateData,
+        [size]: {
+          ...prev.plateData[size],
+          [field]: value
+        }
+      }
+    }));
+  };
+
   const validateStockAvailability = useCallback(() => {
-    if (!editingChallan || editingChallan.type !== 'udhar') return;
+    if (!editState.isOpen || editState.transactionType !== 'udhar') return;
     
     const insufficientStock: StockValidation[] = [];
-    Object.entries(editingChallan.plates).forEach(([size, quantity]) => {
-      if (quantity > 0) {
+    Object.entries(editState.plateData).forEach(([size, data]) => {
+      if (data.quantity > 0) {
         const stock = stockData.find(s => s.plate_size === size);
-        if (stock && quantity > stock.available_quantity) {
+        if (stock && data.quantity > stock.available_quantity) {
           insufficientStock.push({
             size,
-            requested: quantity,
+            requested: data.quantity,
             available: stock.available_quantity
           });
         }
       }
     });
     setStockValidation(insufficientStock);
-  }, [editingChallan, stockData]);
+  }, [editState, stockData]);
 
   useEffect(() => {
     validateStockAvailability();
   }, [validateStockAvailability]);
 
   const handleSaveEdit = async () => {
-    if (!editingChallan) return;
+    if (!editState.isOpen || !editState.transactionId) return;
 
     setEditLoading(true);
     try {
-      if (editingChallan.type === 'udhar') {
-        // Update challan
+      const id = editState.transactionId;
+
+      // Compute deltas and update stock accordingly
+      if (editState.transactionType === 'udhar') {
+        // fetch old challan items
+        const { data: oldItems, error: oldErr } = await supabase
+          .from('challan_items')
+          .select('plate_size, borrowed_quantity, borrowed_stock')
+          .eq('challan_id', id);
+        if (oldErr) throw oldErr;
+
+        // Calculate old totals (only own borrowed_quantity for stock calculations)
+        const oldTotals: Record<string, number> = {};
+        (oldItems || []).forEach((it: any) => {
+          oldTotals[it.plate_size] = (oldTotals[it.plate_size] || 0) + (it.borrowed_quantity || 0);
+        });
+
+        // Calculate new totals (only own quantity for stock calculations)
+        const newTotals: Record<string, number> = {};
+        Object.entries(editState.plateData).forEach(([plate, v]) => {
+          const qty = (v.quantity || 0); // only own quantity
+          if (qty > 0) newTotals[plate] = qty;
+        });
+
+        // Calculate deltas (old - new) as per the requirement
+        const plates = Array.from(new Set([...Object.keys(oldTotals), ...Object.keys(newTotals)]));
+        const deltas: Record<string, number> = {};
+        plates.forEach(p => {
+          const delta = (oldTotals[p] || 0) - (newTotals[p] || 0); // old - new
+          if (delta !== 0) deltas[p] = delta;
+        });
+
+        // If none of the own-quantities changed (old == new for all plates), skip updating main stock
+        const hasOwnQuantityChange = plates.some(p => (oldTotals[p] || 0) !== (newTotals[p] || 0));
+        if (!hasOwnQuantityChange) {
+          console.debug('[Challan Edit][UDHAR] no own-quantity change detected, skipping main stock updates', { oldTotals, newTotals });
+        } else {
+          const { data: stocks, error: stockErr } = await supabase
+            .from('stock')
+            .select('id, plate_size, available_quantity')
+            .in('plate_size', Object.keys(deltas));
+          if (stockErr) throw stockErr;
+
+          const applied: Array<{ id: number; previous: number }> = [];
+          try {
+            for (const s of (stocks || [])) {
+              const delta = deltas[s.plate_size] || 0;
+              if (delta === 0) continue;
+
+              const beforeAvailable = s.available_quantity || 0;
+              // If delta > 0: old > new, so add back to stock (delta amount was reduced, now return it)
+              // If delta < 0: old < new, so reduce from stock (more is being issued)
+              const newAvailable = delta > 0
+                ? beforeAvailable + delta // add back to stock
+                : Math.max(0, beforeAvailable + delta); // reduce from stock (delta is negative)
+
+              // debug log to trace incorrect stock adjustments
+              console.debug('[Challan Edit][UDHAR] plate=%s id=%s delta=%d beforeAvailable=%d newAvailable=%d oldTotals=%o newTotals=%o', s.plate_size, s.id, delta, beforeAvailable, newAvailable, oldTotals, newTotals);
+
+              const { error: updErr } = await supabase
+                .from('stock')
+                .update({ available_quantity: newAvailable })
+                .eq('id', s.id);
+              if (updErr) throw updErr;
+              applied.push({ id: s.id, previous: s.available_quantity || 0 });
+            }
+          } catch (uErr) {
+            // Revert on error
+            for (const a of applied) {
+              try {
+                await supabase.from('stock').update({ available_quantity: a.previous }).eq('id', a.id);
+              } catch (e) {
+                console.error('revert failed', e);
+              }
+            }
+            throw uErr;
+          }
+        }
+
+        // update header then replace items
         const { error: challanError } = await supabase
           .from('challans')
           .update({
-            challan_number: editingChallan.challan_number,
-            challan_date: editingChallan.date,
-            client_id: editingChallan.client_id,
-            driver_name: editingChallan.driver_name || null
+            challan_number: editState.challanNumber,
+            challan_date: editState.date,
+            client_id: editState.clientId,
+            driver_name: editState.driverName || null
           })
-          .eq('id', editingChallan.id);
-
+          .eq('id', id);
         if (challanError) throw challanError;
 
-        // Delete existing items
         const { error: deleteError } = await supabase
           .from('challan_items')
           .delete()
-          .eq('challan_id', editingChallan.id);
-
+          .eq('challan_id', id);
         if (deleteError) throw deleteError;
 
-        // Insert new items
-        const newItems = Object.entries(editingChallan.plates)
-          .filter(([_, quantity]) => quantity > 0 || editingChallan.borrowedStock[_] > 0)
-          .map(([plate_size, quantity]) => ({
-            challan_id: editingChallan.id,
+        const newItems = Object.entries(editState.plateData)
+          .filter(([_, v]) => (v.quantity || 0) > 0 || (v.borrowedStock || 0) > 0)
+          .map(([plate_size, v]) => ({
+            challan_id: id,
             plate_size,
-            borrowed_quantity: quantity,
-            borrowed_stock: editingChallan.borrowedStock[plate_size] || 0,
-            partner_stock_notes: editingChallan.notes[plate_size]?.trim() || null
+            borrowed_quantity: v.quantity || 0,
+            borrowed_stock: v.borrowedStock || 0,
+            partner_stock_notes: (v.notes || '').trim() || null
           }));
 
         if (newItems.length > 0) {
           const { error: insertError } = await supabase
             .from('challan_items')
             .insert(newItems);
-
           if (insertError) throw insertError;
         }
       } else {
-        // Update return
+        // jama (returns) logic remains the same
+        const { data: oldItems, error: oldErr } = await supabase
+          .from('return_line_items')
+          .select('plate_size, returned_quantity, returned_borrowed_stock')
+          .eq('return_id', id);
+        if (oldErr) throw oldErr;
+
+        // For returns, compute deltas only based on returned_quantity (own stock)
+        const oldTotals: Record<string, number> = {};
+        (oldItems || []).forEach((it: any) => {
+          oldTotals[it.plate_size] = (oldTotals[it.plate_size] || 0) + (it.returned_quantity || 0);
+        });
+
+        const newTotals: Record<string, number> = {};
+        Object.entries(editState.plateData).forEach(([plate, v]) => {
+          const qty = (v.quantity || 0);
+          if (qty > 0) newTotals[plate] = qty;
+        });
+
+        const plates = Array.from(new Set([...Object.keys(oldTotals), ...Object.keys(newTotals)]));
+        const deltas: Record<string, number> = {};
+        plates.forEach(p => {
+          const d = (newTotals[p] || 0) - (oldTotals[p] || 0); // positive => more returned => increase available
+          if (d !== 0) deltas[p] = d;
+        });
+
+        // For returns, if returned own quantities didn't change, skip main stock updates
+        const hasOwnReturnChange = plates.some(p => (newTotals[p] || 0) !== (oldTotals[p] || 0));
+        if (!hasOwnReturnChange) {
+          console.debug('[Challan Edit][JAMA] no own-return change detected, skipping main stock updates', { oldTotals, newTotals });
+        } else {
+          const { data: stocks, error: stockErr } = await supabase
+            .from('stock')
+            .select('id, plate_size, available_quantity')
+            .in('plate_size', Object.keys(deltas));
+          if (stockErr) throw stockErr;
+
+          const applied: Array<{ id: number; previous: number }> = [];
+          try {
+            for (const s of (stocks || [])) {
+              const delta = deltas[s.plate_size] || 0;
+              if (delta === 0) continue;
+              const beforeAvailable = s.available_quantity || 0;
+              const newAvailable = Math.max(0, beforeAvailable + delta);
+              console.debug('[Challan Edit][JAMA] plate=%s id=%s delta=%d beforeAvailable=%d newAvailable=%d', s.plate_size, s.id, delta, beforeAvailable, newAvailable);
+              const { error: updErr } = await supabase
+                .from('stock')
+                .update({ available_quantity: newAvailable })
+                .eq('id', s.id);
+              if (updErr) throw updErr;
+              applied.push({ id: s.id, previous: s.available_quantity || 0 });
+            }
+          } catch (uErr) {
+            for (const a of applied) {
+              try { await supabase.from('stock').update({ available_quantity: a.previous }).eq('id', a.id); } catch (e) { console.error('revert failed', e); }
+            }
+            throw uErr;
+          }
+        }
+
         const { error: returnError } = await supabase
           .from('returns')
           .update({
-            return_challan_number: editingChallan.challan_number,
-            return_date: editingChallan.date,
-            client_id: editingChallan.client_id,
-            driver_name: editingChallan.driver_name || null
+            return_challan_number: editState.challanNumber,
+            return_date: editState.date,
+            client_id: editState.clientId,
+            driver_name: editState.driverName || null
           })
-          .eq('id', editingChallan.id);
-
+          .eq('id', id);
         if (returnError) throw returnError;
 
-        // Delete existing items
         const { error: deleteError } = await supabase
           .from('return_line_items')
           .delete()
-          .eq('return_id', editingChallan.id);
-
+          .eq('return_id', id);
         if (deleteError) throw deleteError;
 
-        // Insert new items
-        const newItems = Object.entries(editingChallan.plates)
-          .filter(([_, quantity]) => quantity > 0 || editingChallan.borrowedStock[_] > 0)
-          .map(([plate_size, quantity]) => ({
-            return_id: editingChallan.id,
+        const newItems = Object.entries(editState.plateData)
+          .filter(([_, v]) => (v.quantity || 0) > 0 || (v.borrowedStock || 0) > 0)
+          .map(([plate_size, v]) => ({
+            return_id: id,
             plate_size,
-            returned_quantity: quantity,
-            returned_borrowed_stock: editingChallan.borrowedStock[plate_size] || 0,
-            damage_notes: editingChallan.notes[plate_size] || null
+            returned_quantity: v.quantity || 0,
+            returned_borrowed_stock: v.borrowedStock || 0,
+            damage_notes: (v.notes || '').trim() || null
           }));
 
         if (newItems.length > 0) {
           const { error: insertError } = await supabase
             .from('return_line_items')
             .insert(newItems);
-
           if (insertError) throw insertError;
         }
       }
 
-      setEditingChallan(null);
-      if (selectedClient) {
-        await fetchClientLedger(selectedClient);
-      }
+      closeEditModal();
+      if (selectedClient) await fetchClientLedger(selectedClient);
       alert('ચલણ સફળતાપૂર્વક અપડેટ થયું!');
     } catch (error) {
       console.error('Error updating challan:', error);
@@ -512,33 +687,138 @@ export function ChallanManagementPage() {
   };
 
   const handleDeleteChallan = async () => {
-    if (!editingChallan) return;
+    if (!editState.isOpen || !editState.transactionId) return;
 
-    const confirmDelete = confirm(`શું તમે ખરેખર આ ${editingChallan.type} ચલણ ડિલીટ કરવા માંગો છો? આ ક્રિયા પૂર્વવત્ કરી શકાશે નહીં.`);
+    const confirmDelete = confirm(`શું તમે ખરેખર આ ${editState.transactionType} ચલણ ડિલીટ કરવા માંગો છો? આ ક્રિયા પૂર્વવત્ કરી શકાશે નહીં.`);
     if (!confirmDelete) return;
 
     setEditLoading(true);
     try {
-      if (editingChallan.type === 'udhar') {
-        const { error } = await supabase
+      const id = editState.transactionId;
+      if (editState.transactionType === 'udhar') {
+        // read items and restore to stock
+        const { data: items, error: itemsErr } = await supabase
+          .from('challan_items')
+          .select('plate_size, borrowed_quantity, borrowed_stock')
+          .eq('challan_id', id);
+        if (itemsErr) throw itemsErr;
+
+        // Only restore own borrowed quantities to stock (ignore borrowed_stock here)
+        const deltas: Record<string, number> = {};
+        (items || []).forEach((it: any) => {
+          const qty = (it.borrowed_quantity || 0);
+          if (qty > 0) deltas[it.plate_size] = (deltas[it.plate_size] || 0) + qty;
+        });
+
+        // Only restore own borrowed quantities to stock; if none exist, skip
+        const hasOwnRestore = Object.keys(deltas).some(p => (deltas[p] || 0) !== 0);
+        if (!hasOwnRestore) {
+          console.debug('[Challan Delete][UDHAR] no own borrowed quantities to restore, skipping main stock updates', { deltas });
+        } else {
+          const { data: stocks, error: stockErr } = await supabase
+            .from('stock')
+            .select('id, plate_size, available_quantity')
+            .in('plate_size', Object.keys(deltas));
+          if (stockErr) throw stockErr;
+
+          const applied: Array<{ id: number; previous: number }> = [];
+          try {
+            for (const s of (stocks || [])) {
+              const delta = deltas[s.plate_size] || 0;
+              if (delta === 0) continue;
+                const beforeAvailable = s.available_quantity || 0;
+                const newAvailable = beforeAvailable + delta;
+                console.debug('[Challan Delete][UDHAR] plate=%s id=%s delta=%d beforeAvailable=%d newAvailable=%d', s.plate_size, s.id, delta, beforeAvailable, newAvailable);
+                const { error: updErr } = await supabase
+                  .from('stock')
+                  .update({ available_quantity: newAvailable })
+                  .eq('id', s.id);
+              if (updErr) throw updErr;
+              applied.push({ id: s.id, previous: s.available_quantity || 0 });
+            }
+          } catch (uErr) {
+            for (const a of applied) {
+              try { await supabase.from('stock').update({ available_quantity: a.previous }).eq('id', a.id); } catch (e) { console.error('revert failed', e); }
+            }
+            throw uErr;
+          }
+        }
+
+        const { error: deleteItemsError } = await supabase
+          .from('challan_items')
+          .delete()
+          .eq('challan_id', id);
+        if (deleteItemsError) throw deleteItemsError;
+
+        const { error: deleteHeaderError } = await supabase
           .from('challans')
           .delete()
-          .eq('id', editingChallan.id);
-
-        if (error) throw error;
+          .eq('id', id);
+        if (deleteHeaderError) throw deleteHeaderError;
       } else {
-        const { error } = await supabase
+        // jama: subtract returned amounts from stock
+        const { data: items, error: itemsErr } = await supabase
+          .from('return_line_items')
+          .select('plate_size, returned_quantity, returned_borrowed_stock')
+          .eq('return_id', id);
+        if (itemsErr) throw itemsErr;
+
+        // For jama delete, subtract only the returned_quantity from available stock (borrowed stock handled separately)
+        const deltas: Record<string, number> = {};
+        (items || []).forEach((it: any) => {
+          const qty = (it.returned_quantity || 0);
+          if (qty > 0) deltas[it.plate_size] = (deltas[it.plate_size] || 0) + qty;
+        });
+
+        // For jama delete, if no returned own quantities present, skip main stock subtraction
+        const hasOwnJamaDelete = Object.keys(deltas).some(p => (deltas[p] || 0) !== 0);
+        if (!hasOwnJamaDelete) {
+          console.debug('[Challan Delete][JAMA] no own returned quantities to subtract, skipping main stock updates', { deltas });
+        } else {
+          const { data: stocks, error: stockErr } = await supabase
+            .from('stock')
+            .select('id, plate_size, available_quantity')
+            .in('plate_size', Object.keys(deltas));
+          if (stockErr) throw stockErr;
+
+          const applied: Array<{ id: number; previous: number }> = [];
+          try {
+            for (const s of (stocks || [])) {
+              const delta = deltas[s.plate_size] || 0;
+              if (delta === 0) continue;
+              const beforeAvailable = s.available_quantity || 0;
+              const newAvailable = Math.max(0, beforeAvailable - delta);
+              console.debug('[Challan Delete][JAMA] plate=%s id=%s delta=%d beforeAvailable=%d newAvailable=%d', s.plate_size, s.id, delta, beforeAvailable, newAvailable);
+              const { error: updErr } = await supabase
+                .from('stock')
+                .update({ available_quantity: newAvailable })
+                .eq('id', s.id);
+              if (updErr) throw updErr;
+              applied.push({ id: s.id, previous: s.available_quantity || 0 });
+            }
+          } catch (uErr) {
+            for (const a of applied) {
+              try { await supabase.from('stock').update({ available_quantity: a.previous }).eq('id', a.id); } catch (e) { console.error('revert failed', e); }
+            }
+            throw uErr;
+          }
+        }
+
+        const { error: deleteItemsError } = await supabase
+          .from('return_line_items')
+          .delete()
+          .eq('return_id', id);
+        if (deleteItemsError) throw deleteItemsError;
+
+        const { error: deleteHeaderError } = await supabase
           .from('returns')
           .delete()
-          .eq('id', editingChallan.id);
-
-        if (error) throw error;
+          .eq('id', id);
+        if (deleteHeaderError) throw deleteHeaderError;
       }
 
-      setEditingChallan(null);
-      if (selectedClient) {
-        await fetchClientLedger(selectedClient);
-      }
+      closeEditModal();
+      if (selectedClient) await fetchClientLedger(selectedClient);
       alert('ચલણ સફળતાપૂર્વક ડિલીટ થયું!');
     } catch (error) {
       console.error('Error deleting challan:', error);
@@ -639,7 +919,7 @@ export function ChallanManagementPage() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="ગ્રાહક શોધો..."
+                placeholder="ચલણ નંબર શોઘો..."
                 className="w-full py-3 pl-10 pr-4 text-sm transition-all duration-200 border-2 border-blue-200 rounded-lg focus:ring-4 focus:ring-blue-100 focus:border-blue-500"
               />
             </div>
@@ -671,7 +951,7 @@ export function ChallanManagementPage() {
                     key={client.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="overflow-hidden transition-all duration-200 bg-white border-2 border-blue-100 shadow-lg rounded-xl hover:shadow-xl hover:border-blue-200 cursor-pointer"
+                    className="overflow-hidden transition-all duration-200 bg-white border-2 border-blue-100 shadow-lg cursor-pointer rounded-xl hover:shadow-xl hover:border-blue-200"
                     onClick={() => handleClientSelect(client)}
                   >
                     <div className="p-4">
@@ -713,7 +993,7 @@ export function ChallanManagementPage() {
                     setSelectedClient(null);
                     setClientLedger(null);
                     setExpandedClient(null);
-                    setEditingChallan(null);
+                    closeEditModal();
                   }}
                   className="flex items-center gap-2 text-blue-600 hover:text-blue-700"
                 >
@@ -724,7 +1004,7 @@ export function ChallanManagementPage() {
                   <h2 className="text-sm font-bold text-gray-900">{selectedClient.name}</h2>
                   <p className="text-xs text-blue-600">ID: {selectedClient.id}</p>
                   {clientLedger && (
-                    <p className="text-xs text-red-600 font-medium">
+                    <p className="text-xs font-medium text-red-600">
                       કુલ બાકી: {clientLedger.total_outstanding} પ્લેટ્સ
                     </p>
                   )}
@@ -762,16 +1042,16 @@ export function ChallanManagementPage() {
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="text-white bg-gradient-to-r from-blue-500 to-indigo-500">
-                        <th className="px-2 py-2 text-left font-bold">ચલણ નં.</th>
-                        <th className="px-2 py-2 text-center font-bold">તારીખ</th>
-                        <th className="px-2 py-2 text-center font-bold">કુલ</th>
-                        <th className="px-2 py-2 text-center font-bold">પ્રકાર</th>
-                        <th className="px-2 py-2 text-center font-bold">ડ્રાઈવર</th>
-                        <th className="px-2 py-2 text-center font-bold">ક્રિયાઓ</th>
+                        <th className="px-2 py-2 font-bold text-left">ચલણ નં.</th>
+                        <th className="px-2 py-2 font-bold text-center">તારીખ</th>
+                        <th className="px-2 py-2 font-bold text-center">કુલ</th>
+                        <th className="px-2 py-2 font-bold text-center">પ્રકાર</th>
+                        <th className="px-2 py-2 font-bold text-center">ડ્રાઈવર</th>
+                        <th className="px-2 py-2 font-bold text-center">ક્રિયાઓ</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {clientLedger?.all_transactions.map((transaction, index) => (
+                      {clientLedger?.all_transactions.map((transaction) => (
                         <tr 
                           key={`${transaction.type}-${transaction.id}`}
                           className={`border-b border-blue-100 hover:bg-blue-25 transition-colors ${
@@ -815,15 +1095,18 @@ export function ChallanManagementPage() {
                           </td>
                           <td className="px-2 py-2">
                             <div className="flex items-center justify-center gap-1">
-                              {/* Edit Button */}
+                              {/* COMPLETELY NEW EDIT BUTTON APPROACH */}
                               {user?.isAdmin ? (
-                                <button
-                                  onClick={() => handleEditChallan(transaction)}
-                                  className="p-1 text-blue-600 rounded hover:bg-blue-50 transition-colors"
+                                <div
+                                  onClick={() => {
+                                    console.log('🎯 DIV CLICKED - Opening edit for:', transaction.id, transaction.type);
+                                    openEditModal(transaction.id, transaction.type);
+                                  }}
+                                  className="p-1 text-blue-600 transition-colors rounded cursor-pointer hover:bg-blue-50"
                                   title="એડિટ"
                                 >
                                   <Edit className="w-3 h-3" />
-                                </button>
+                                </div>
                               ) : (
                                 <div className="p-1 text-gray-400">
                                   <Lock className="w-3 h-3" />
@@ -837,7 +1120,7 @@ export function ChallanManagementPage() {
                                     ? null 
                                     : `${transaction.type}-${transaction.id}`
                                 )}
-                                className="p-1 text-blue-600 rounded hover:bg-blue-50 transition-colors"
+                                className="p-1 text-blue-600 transition-colors rounded hover:bg-blue-50"
                                 title="જુઓ"
                               >
                                 <Eye className="w-3 h-3" />
@@ -847,7 +1130,7 @@ export function ChallanManagementPage() {
                               <button
                                 onClick={() => handleDownload(transaction)}
                                 disabled={downloading === transaction.id}
-                                className="p-1 text-green-600 rounded hover:bg-green-50 transition-colors disabled:opacity-50"
+                                className="p-1 text-green-600 transition-colors rounded hover:bg-green-50 disabled:opacity-50"
                                 title="ડાઉનલોડ"
                               >
                                 {downloading === transaction.id ? (
@@ -923,17 +1206,17 @@ export function ChallanManagementPage() {
           </>
         )}
 
-        {/* Edit Modal */}
-        {editingChallan && user?.isAdmin && (
+        {/* NEW SIMPLE EDIT MODAL */}
+        {editState.isOpen && user?.isAdmin && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-blue-900/30 backdrop-blur-sm">
             <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border-4 border-blue-200">
               <div className="p-4 text-white bg-gradient-to-r from-blue-600 to-indigo-600">
                 <div className="flex items-center justify-between">
                   <h2 className="text-base font-semibold">
-                    {editingChallan.type === 'udhar' ? 'ઉધાર' : 'જમા'} ચલણ એડિટ કરો
+                    {editState.transactionType === 'udhar' ? 'ઉધાર' : 'જમા'} ચલણ એડિટ કરો - #{editState.challanNumber}
                   </h2>
                   <button
-                    onClick={() => setEditingChallan(null)}
+                    onClick={closeEditModal}
                     className="p-2 transition-colors rounded-lg hover:bg-blue-500/20"
                   >
                     <X className="w-5 h-5" />
@@ -950,11 +1233,8 @@ export function ChallanManagementPage() {
                     </label>
                     <input
                       type="text"
-                      value={editingChallan.challan_number}
-                      onChange={(e) => setEditingChallan({
-                        ...editingChallan,
-                        challan_number: e.target.value
-                      })}
+                      value={editState.challanNumber}
+                      onChange={(e) => updateEditField('challanNumber', e.target.value)}
                       className="w-full px-3 py-2 text-sm border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
                     />
                   </div>
@@ -964,11 +1244,8 @@ export function ChallanManagementPage() {
                     </label>
                     <input
                       type="date"
-                      value={editingChallan.date}
-                      onChange={(e) => setEditingChallan({
-                        ...editingChallan,
-                        date: e.target.value
-                      })}
+                      value={editState.date}
+                      onChange={(e) => updateEditField('date', e.target.value)}
                       className="w-full px-3 py-2 text-sm border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
                     />
                   </div>
@@ -981,11 +1258,8 @@ export function ChallanManagementPage() {
                   </label>
                   <input
                     type="text"
-                    value={editingChallan.driver_name}
-                    onChange={(e) => setEditingChallan({
-                      ...editingChallan,
-                      driver_name: e.target.value
-                    })}
+                    value={editState.driverName}
+                    onChange={(e) => updateEditField('driverName', e.target.value)}
                     list="driver-suggestions"
                     className="w-full px-3 py-2 text-sm border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
                     placeholder="ડ્રાઈવરનું નામ દાખલ કરો"
@@ -998,8 +1272,8 @@ export function ChallanManagementPage() {
                 </div>
 
                 {/* Stock Warning */}
-                {stockValidation.length > 0 && editingChallan.type === 'udhar' && (
-                  <div className="flex items-center gap-2 p-3 text-amber-600 border rounded-lg bg-amber-50 border-amber-200">
+                {stockValidation.length > 0 && editState.transactionType === 'udhar' && (
+                  <div className="flex items-center gap-2 p-3 border rounded-lg text-amber-600 bg-amber-50 border-amber-200">
                     <AlertTriangle className="w-4 h-4" />
                     <span className="text-sm font-medium">કેટલીક વસ્તુઓમાં અપૂરતો સ્ટોક છે.</span>
                   </div>
@@ -1014,19 +1288,20 @@ export function ChallanManagementPage() {
                     <table className="w-full text-xs border border-gray-200 rounded-lg">
                       <thead>
                         <tr className="bg-gray-50">
-                          <th className="px-3 py-2 text-left font-medium text-gray-700">સાઇઝ</th>
-                          {editingChallan.type === 'udhar' && (
-                            <th className="px-3 py-2 text-center font-medium text-gray-700">સ્ટોક</th>
+                          <th className="px-3 py-2 font-medium text-left text-gray-700">સાઇઝ</th>
+                          {editState.transactionType === 'udhar' && (
+                            <th className="px-3 py-2 font-medium text-center text-gray-700">સ્ટોક</th>
                           )}
-                          <th className="px-3 py-2 text-center font-medium text-gray-700">માત્રા</th>
-                          <th className="px-3 py-2 text-center font-medium text-gray-700">બિજો ડેપો</th>
-                          <th className="px-3 py-2 text-center font-medium text-gray-700">નોંધ</th>
+                          <th className="px-3 py-2 font-medium text-center text-gray-700">માત્રા</th>
+                          <th className="px-3 py-2 font-medium text-center text-gray-700">બિજો ડેપો</th>
+                          <th className="px-3 py-2 font-medium text-center text-gray-700">નોંધ</th>
                         </tr>
                       </thead>
                       <tbody>
                         {PLATE_SIZES.map(size => {
                           const stockInfo = getStockInfo(size);
                           const isInsufficient = isStockInsufficient(size);
+                          const plateInfo = editState.plateData[size] || { quantity: 0, borrowedStock: 0, notes: '' };
                           
                           return (
                             <tr key={size} className={`border-b hover:bg-gray-50 ${isInsufficient ? 'bg-red-50' : ''}`}>
@@ -1036,7 +1311,7 @@ export function ChallanManagementPage() {
                                   <span className="font-medium text-gray-900">{size}</span>
                                 </div>
                               </td>
-                              {editingChallan.type === 'udhar' && (
+                              {editState.transactionType === 'udhar' && (
                                 <td className="px-3 py-2 text-center">
                                   <span className={`text-xs ${stockInfo ? 'text-gray-600' : 'text-red-500'}`}>
                                     {stockInfo ? stockInfo.available_quantity : 'N/A'}
@@ -1047,14 +1322,8 @@ export function ChallanManagementPage() {
                                 <input
                                   type="number"
                                   min="0"
-                                  value={editingChallan.plates[size] || ''}
-                                  onChange={(e) => setEditingChallan({
-                                    ...editingChallan,
-                                    plates: {
-                                      ...editingChallan.plates,
-                                      [size]: parseInt(e.target.value) || 0
-                                    }
-                                  })}
+                                  value={plateInfo.quantity || ''}
+                                  onChange={(e) => updatePlateData(size, 'quantity', parseInt(e.target.value) || 0)}
                                   className={`w-16 px-2 py-1 text-xs text-center border rounded focus:ring-1 ${
                                     isInsufficient 
                                       ? 'border-red-300 focus:ring-red-200 focus:border-red-500' 
@@ -1072,14 +1341,8 @@ export function ChallanManagementPage() {
                                 <input
                                   type="number"
                                   min="0"
-                                  value={editingChallan.borrowedStock[size] || ''}
-                                  onChange={(e) => setEditingChallan({
-                                    ...editingChallan,
-                                    borrowedStock: {
-                                      ...editingChallan.borrowedStock,
-                                      [size]: parseInt(e.target.value) || 0
-                                    }
-                                  })}
+                                  value={plateInfo.borrowedStock || ''}
+                                  onChange={(e) => updatePlateData(size, 'borrowedStock', parseInt(e.target.value) || 0)}
                                   className="w-16 px-2 py-1 text-xs text-center border border-purple-300 rounded bg-purple-50 focus:ring-1 focus:ring-purple-200 focus:border-purple-500"
                                   placeholder="0"
                                 />
@@ -1087,14 +1350,8 @@ export function ChallanManagementPage() {
                               <td className="px-3 py-2 text-center">
                                 <input
                                   type="text"
-                                  value={editingChallan.notes[size] || ''}
-                                  onChange={(e) => setEditingChallan({
-                                    ...editingChallan,
-                                    notes: {
-                                      ...editingChallan.notes,
-                                      [size]: e.target.value
-                                    }
-                                  })}
+                                  value={plateInfo.notes || ''}
+                                  onChange={(e) => updatePlateData(size, 'notes', e.target.value)}
                                   className="w-20 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-200 focus:border-blue-500"
                                   placeholder="નોંધ"
                                 />
@@ -1114,7 +1371,7 @@ export function ChallanManagementPage() {
                       <div className="text-xs text-center">
                         <div className="font-medium text-blue-800">પોતાની પ્લેટ</div>
                         <div className="text-lg font-bold text-blue-700">
-                          {Object.values(editingChallan.plates).reduce((sum, qty) => sum + (qty || 0), 0)}
+                          {Object.values(editState.plateData).reduce((sum, data) => sum + (data.quantity || 0), 0)}
                         </div>
                       </div>
                     </div>
@@ -1122,7 +1379,7 @@ export function ChallanManagementPage() {
                       <div className="text-xs text-center">
                         <div className="font-medium text-purple-800">બિજો ડેપો</div>
                         <div className="text-lg font-bold text-purple-700">
-                          {Object.values(editingChallan.borrowedStock).reduce((sum, qty) => sum + (qty || 0), 0)}
+                          {Object.values(editState.plateData).reduce((sum, data) => sum + (data.borrowedStock || 0), 0)}
                         </div>
                       </div>
                     </div>
@@ -1130,8 +1387,7 @@ export function ChallanManagementPage() {
                       <div className="text-center">
                         <div className="text-xs font-medium text-blue-100">કુલ પ્લેટ</div>
                         <div className="text-lg font-bold text-white">
-                          {Object.values(editingChallan.plates).reduce((sum, qty) => sum + (qty || 0), 0) +
-                           Object.values(editingChallan.borrowedStock).reduce((sum, qty) => sum + (qty || 0), 0)}
+                          {Object.values(editState.plateData).reduce((sum, data) => sum + (data.quantity || 0) + (data.borrowedStock || 0), 0)}
                         </div>
                       </div>
                     </div>
@@ -1161,7 +1417,7 @@ export function ChallanManagementPage() {
                     ડિલીટ કરો
                   </button>
                   <button
-                    onClick={() => setEditingChallan(null)}
+                    onClick={closeEditModal}
                     disabled={editLoading}
                     className="flex-1 px-4 py-3 text-sm font-medium text-white transition-colors bg-gray-500 rounded-lg hover:bg-gray-600 disabled:opacity-50"
                   >

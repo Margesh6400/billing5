@@ -172,11 +172,26 @@ export const generateClientLedgerJPG = async (data: ClientLedgerData): Promise<s
         </tbody>
       </table>
 
+      <div style="margin-top:15px;display:flex;justify-content:center;gap:15px;font-size:12px;">
+        <div style="display:flex;align-items:center;gap:4px;">
+          <div style="width:10px;height:10px;background:#f59e0b;border-radius:9999px;box-shadow:0 1px 2px rgba(0,0,0,0.3);"></div>
+          <span style="font-weight:500;color:#1d4ed8;">ઉધાર</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <div style="width:10px;height:10px;background:#22c55e;border-radius:9999px;box-shadow:0 1px 2px rgba(0,0,0,0.3);"></div>
+          <span style="font-weight:500;color:#1d4ed8;">જમા</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <div style="width:10px;height:10px;background:#3b82f6;border-radius:9999px;box-shadow:0 1px 2px rgba(0,0,0,0.3);"></div>
+          <span style="font-weight:500;color:#1d4ed8;">ચાલુ નંગ</span>
+        </div>
+      </div>
+
       <div style="margin-top:40px;font-size:13px;color:#666;text-align:center;">
-        સુરેશભાઈ પોલારા: +91 93287 28228
+        સુરેશભાઈ પોલરા: +91 93287 28228
       </div>
       <div style="margin-top:3px;font-size:13px;color:#666;text-align:center;">
-        હરેશભાઈ પોલારા: +91 90992 64436
+        હરેશભાઈ પોલરા: +91 90992 64436
       </div>
       <div style="margin-top:20px;font-size:11px;color:#999;text-align:center;">
         Created: ${new Date(data.generated_date).toLocaleString('gu-IN')}

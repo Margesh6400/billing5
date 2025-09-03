@@ -9,38 +9,28 @@ type ReturnLineItem = Database['public']['Tables']['return_line_items']['Row'];
 
 export interface LedgerEntry {
   date: string;
-  effective_date: string; // When the entry actually affects balance
-  plates_before: number; // NEW: Balance before this entry
-  udhar: number; // Issued plates
-  jama: number;  // Returned plates
-  balance_after: number; // Balance after applying this entry
-  entry_type: 'udhar' | 'jama';
-  challan_number: string;
-  sort_priority: number; // For same-day sorting (udhar=1, jama=2)
-}
-
-export interface DateRangeBilling {
-  start_date: string;
-  end_date: string;
-  plate_balance: number;
+  plates_before: number; // પ્લેટ્સ column - balance before this entry
+  udhar: number;
+  jama: number;
+  balance_after: number; // બાકી પ્લેટ્સ - balance after this entry
   days: number;
   rent_amount: number;
-  entry_info?: string; // Additional info about the entry
+  challan_number: string;
+  entry_type: 'udhar' | 'jama';
 }
 
 export interface BillingRates {
   daily_rent_rate: number;      // ₹1 by default
-  service_charge_rate: number;  // ₹7 by default
+  service_charge_rate: number;  // ₹7 by default  
   worker_charge: number;        // ₹100 by default
   lost_plate_penalty: number;   // ₹250 by default
 }
 
-export interface ComprehensiveBillData {
+export interface GujaratiBillData {
   client: Client;
   bill_number: string;
   bill_date: string;
   ledger_entries: LedgerEntry[];
-  date_ranges: DateRangeBilling[];
   
   // Calculations
   total_rent: number;
@@ -57,7 +47,7 @@ export interface ComprehensiveBillData {
   rates: BillingRates;
 }
 
-export class ComprehensiveBillingCalculator {
+export class GujaratiBillingCalculator {
   private defaultRates: BillingRates = {
     daily_rent_rate: 1.00,
     service_charge_rate: 7.00,
@@ -71,7 +61,7 @@ export class ComprehensiveBillingCalculator {
     }
   }
 
-  async fetchClientLedgerData(clientId: string, startDate?: string, endDate?: string) {
+  async fetchClientTransactionData(clientId: string, startDate?: string, endDate?: string) {
     try {
       // Fetch all challans for the client
       const { data: challans, error: challansError } = await supabase
@@ -121,25 +111,24 @@ export class ComprehensiveBillingCalculator {
 
       return { challans: challans || [], returns: returns || [] };
     } catch (error) {
-      console.error('Error fetching client ledger data:', error);
+      console.error('Error fetching client transaction data:', error);
       throw error;
     }
   }
 
-  calculateComprehensiveBilling(
+  calculateGujaratiBill(
     client: Client,
     challans: any[],
     returns: any[],
     billDate: string,
     rates: Partial<BillingRates> = {},
     advancePaid: number = 0
-  ): ComprehensiveBillData {
+  ): GujaratiBillData {
     const finalRates = { ...this.defaultRates, ...rates };
 
     // Step 1: Create all entries and sort by date ascending
     const allEntries: Array<{
       date: string;
-      effective_date: string;
       type: 'udhar' | 'jama';
       plates: number;
       challan_number: string;
@@ -154,7 +143,6 @@ export class ComprehensiveBillingCalculator {
       
       allEntries.push({
         date: challan.challan_date,
-        effective_date: challan.challan_date, // Udhar effective same day
         type: 'udhar',
         plates: totalPlates,
         challan_number: challan.challan_number,
@@ -168,14 +156,8 @@ export class ComprehensiveBillingCalculator {
         sum + item.returned_quantity + (item.returned_borrowed_stock || 0), 0
       );
       
-      // Calculate effective date (next day for jama)
-      const jamaDate = new Date(returnRecord.return_date);
-      const effectiveDate = new Date(jamaDate);
-      effectiveDate.setDate(effectiveDate.getDate() + 1);
-      
       allEntries.push({
         date: returnRecord.return_date,
-        effective_date: effectiveDate.toISOString().split('T')[0], // Jama effective next day
         type: 'jama',
         plates: totalPlates,
         challan_number: returnRecord.return_challan_number,
@@ -187,116 +169,76 @@ export class ComprehensiveBillingCalculator {
     allEntries.sort((a, b) => {
       const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime();
       if (dateCompare === 0) {
-        return a.sort_priority - b.sort_priority; // Udhar before jama on same day
+        return a.sort_priority - b.sort_priority;
       }
       return dateCompare;
     });
 
-    // Step 3: Build ledger entries with પ્લેટ્સ column
+    // Step 3: Build ledger entries with પ્લેટ્સ column and days calculation
     const ledgerEntries: LedgerEntry[] = [];
     let currentBalance = 0;
 
-    allEntries.forEach(entry => {
+    allEntries.forEach((entry, index) => {
       const platesBefore = currentBalance; // Balance before this entry
       
-      // Apply balance change based on entry type
+      // Apply balance change
       if (entry.type === 'udhar') {
-        currentBalance += entry.plates; // Udhar increases balance immediately
+        currentBalance += entry.plates;
+      } else {
+        currentBalance -= entry.plates;
+        // Ensure balance never goes negative
+        currentBalance = Math.max(0, currentBalance);
       }
-      // Note: Jama doesn't change currentBalance here since it's effective next day
-      
+
+      // Calculate days until next entry or bill date
+      let days = 0;
+      let rentAmount = 0;
+
+      if (index < allEntries.length - 1) {
+        // Calculate days until next entry
+        const currentDate = new Date(entry.date);
+        const nextDate = new Date(allEntries[index + 1].date);
+        days = Math.ceil((nextDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Apply jama rule: if this is jama, reduce days by 1
+        if (entry.type === 'jama' && days > 0) {
+          days = days - 1;
+        }
+      } else {
+        // Last entry: calculate until bill date
+        const currentDate = new Date(entry.date);
+        const billDateObj = new Date(billDate);
+        days = Math.ceil((billDateObj.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        
+        // Apply jama rule: if this is jama, reduce days by 1
+        if (entry.type === 'jama' && days > 0) {
+          days = days - 1;
+        }
+      }
+
+      // Ensure no negative days
+      days = Math.max(0, days);
+
+      // Calculate rent for this period using balance AFTER the entry
+      if (days > 0 && currentBalance > 0) {
+        rentAmount = currentBalance * days * finalRates.daily_rent_rate;
+      }
+
       ledgerEntries.push({
         date: entry.date,
-        effective_date: entry.effective_date,
         plates_before: platesBefore,
         udhar: entry.type === 'udhar' ? entry.plates : 0,
         jama: entry.type === 'jama' ? entry.plates : 0,
-        balance_after: entry.type === 'udhar' ? currentBalance : platesBefore, // Show balance after udhar, before for jama
-        entry_type: entry.type,
+        balance_after: currentBalance,
+        days: days,
+        rent_amount: rentAmount,
         challan_number: entry.challan_number,
-        sort_priority: entry.sort_priority
+        entry_type: entry.type
       });
     });
 
-    // Step 4: Calculate date ranges for billing using effective dates
-    const dateRanges: DateRangeBilling[] = [];
-    let effectiveBalance = 0;
-
-    // Create a timeline of effective balance changes
-    const effectiveEntries: Array<{
-      effective_date: string;
-      balance_change: number;
-      entry_info: string;
-    }> = [];
-
-    allEntries.forEach(entry => {
-      if (entry.type === 'udhar') {
-        effectiveEntries.push({
-          effective_date: entry.effective_date,
-          balance_change: entry.plates,
-          entry_info: `Udhar ${entry.plates} plates`
-        });
-      } else {
-        effectiveEntries.push({
-          effective_date: entry.effective_date,
-          balance_change: -entry.plates,
-          entry_info: `Jama ${entry.plates} plates (from ${entry.date})`
-        });
-      }
-    });
-
-    // Sort effective entries by effective date
-    effectiveEntries.sort((a, b) => 
-      new Date(a.effective_date).getTime() - new Date(b.effective_date).getTime()
-    );
-
-    // Calculate billing ranges
-    for (let i = 0; i < effectiveEntries.length; i++) {
-      const currentEntry = effectiveEntries[i];
-      const nextEntry = effectiveEntries[i + 1];
-      
-      // Apply balance change
-      effectiveBalance += currentEntry.balance_change;
-      
-      let startDate = currentEntry.effective_date;
-      let endDate: string;
-      let days: number;
-
-      if (nextEntry) {
-        // Calculate until the day before next entry's effective date
-        const nextDate = new Date(nextEntry.effective_date);
-        const endDateObj = new Date(nextDate);
-        endDateObj.setDate(endDateObj.getDate() - 1);
-        endDate = endDateObj.toISOString().split('T')[0];
-        
-        // Calculate days between current effective date and next effective date
-        const currentDate = new Date(currentEntry.effective_date);
-        days = Math.ceil((nextDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
-      } else {
-        // Last entry: calculate until bill date
-        endDate = billDate;
-        const currentDate = new Date(currentEntry.effective_date);
-        const billDateObj = new Date(billDate);
-        days = Math.ceil((billDateObj.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      }
-
-      // Only add range if there are days to bill and balance > 0
-      if (days > 0 && effectiveBalance > 0) {
-        const rentAmount = effectiveBalance * days * finalRates.daily_rent_rate;
-
-        dateRanges.push({
-          start_date: startDate,
-          end_date: endDate,
-          plate_balance: effectiveBalance,
-          days: days,
-          rent_amount: rentAmount,
-          entry_info: currentEntry.entry_info
-        });
-      }
-    }
-
-    // Step 5: Calculate totals
-    const totalRent = dateRanges.reduce((sum, range) => sum + range.rent_amount, 0);
+    // Step 4: Calculate totals
+    const totalRent = ledgerEntries.reduce((sum, entry) => sum + entry.rent_amount, 0);
     
     // Calculate total plates issued (for service charge)
     const totalPlatesIssued = challans.reduce((sum, challan) => {
@@ -319,7 +261,7 @@ export class ComprehensiveBillingCalculator {
       );
     }, 0);
 
-    const lostPlatesCount = Math.max(0, totalPlatesIssued - totalPlatesReturned + totalDamagedAndLost);
+    const lostPlatesCount = Math.max(0, totalPlatesIssued - totalPlatesReturned);
 
     // Calculate charges
     const serviceCharge = totalPlatesIssued * finalRates.service_charge_rate;
@@ -335,7 +277,6 @@ export class ComprehensiveBillingCalculator {
       bill_number: '', // Will be set by caller
       bill_date: billDate,
       ledger_entries: ledgerEntries,
-      date_ranges: dateRanges,
       total_rent: totalRent,
       total_plates_issued: totalPlatesIssued,
       service_charge: serviceCharge,
@@ -380,7 +321,7 @@ export class ComprehensiveBillingCalculator {
   formatDateRange(startDate: string, endDate: string): string {
     const start = new Date(startDate).toLocaleDateString('en-GB');
     const end = new Date(endDate).toLocaleDateString('en-GB');
-    return startDate === endDate ? start : `${start} – ${end}`;
+    return startDate === endDate ? start : `${start} થી ${end}`;
   }
 
   calculateDaysBetween(startDate: string, endDate: string): number {

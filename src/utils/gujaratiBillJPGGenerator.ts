@@ -1,7 +1,7 @@
 import html2canvas from 'html2canvas';
-import { ComprehensiveBillData } from './comprehensiveBillingCalculator';
+import { GujaratiBillData } from './gujaratiBillingCalculator';
 
-export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData): Promise<string> => {
+export const generateGujaratiBillJPG = async (data: GujaratiBillData): Promise<string> => {
   const tempDiv = document.createElement('div');
   tempDiv.style.position = 'absolute';
   tempDiv.style.left = '-9999px';
@@ -19,16 +19,16 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
     }).format(amount);
   };
 
-  // Format date
-  const formatDate = (dateString: string) => {
+  // Format date in Gujarati style
+  const formatGujaratiDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-GB');
   };
 
-  // Format date range
+  // Format date range in Gujarati
   const formatDateRange = (startDate: string, endDate: string) => {
-    const start = formatDate(startDate);
-    const end = formatDate(endDate);
-    return startDate === endDate ? start : `${start} – ${end}`;
+    const start = formatGujaratiDate(startDate);
+    const end = formatGujaratiDate(endDate);
+    return startDate === endDate ? start : `${start} થી ${end}`;
   };
 
   tempDiv.innerHTML = `
@@ -36,16 +36,19 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
       <!-- Header -->
       <div style="text-align:center;margin-bottom:30px;border-bottom:3px solid #1e40af;padding-bottom:20px;">
         <h1 style="font-size:48px;font-weight:bold;color:#1e40af;margin:0;">નીલકંઠ પ્લેટ ડેપો</h1>
-        <p style="font-size:16px;color:#888;margin:8px 0;">સેન્ટરિંગ પ્લેટ્સ ભાડા સેવા</p>
-       </div>
+        <p style="font-size:18px;color:#888;margin:8px 0;">સેન્ટરિંગ પ્લેટ્સ ભાડા સેવા</p>
+        <div style="margin-top:15px;padding:10px;background:#e0e7ff;border-radius:8px;">
+          <h2 style="margin:0;font-size:24px;color:#1e40af;font-weight:bold;">ભાડા બિલ / RENT BILL</h2>
+        </div>
+      </div>
 
       <!-- Client Details -->
       <div style="margin-bottom:25px;background:#f1f5f9;padding:20px;border-radius:8px;border-left:4px solid #1e40af;">
-        <h3 style="margin:0 0 15px 0;font-size:22px;color:#1e40af;font-weight:bold;">Client Information / ગ્રાહક માહિતી</h3>
+        <h3 style="margin:0 0 15px 0;font-size:22px;color:#1e40af;font-weight:bold;">ગ્રાહકની માહિતી / Client Information</h3>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
           <div>
-            <p style="margin:0;font-size:18px;"><strong>નામ:</strong> ${data.client.name}</p>
-            <p style="margin:8px 0 0 0;font-size:16px;"><strong>Client ID:</strong> ${data.client.id}</p>
+            <p style="margin:0;font-size:18px;"><strong>ગ્રાહકનું નામ:</strong> ${data.client.name}</p>
+            <p style="margin:8px 0 0 0;font-size:16px;"><strong>ગ્રાહક ID:</strong> ${data.client.id}</p>
           </div>
           <div>
             <p style="margin:0;font-size:18px;"><strong>સાઇટ:</strong> ${data.client.site || '-'}</p>
@@ -53,77 +56,51 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
           </div>
         </div>
         <div style="margin-top:15px;padding:10px;background:#e0e7ff;border-radius:6px;">
-          <p style="margin:0;font-size:16px;"><strong>Bill No:</strong> ${data.bill_number} | <strong>Bill Date:</strong> ${formatDate(data.bill_date)}</p>
+          <p style="margin:0;font-size:16px;"><strong>બિલ નંબર:</strong> ${data.bill_number} | <strong>બિલ તારીખ:</strong> ${formatGujaratiDate(data.bill_date)}</p>
         </div>
       </div>
 
-      <!-- Ledger Entries Table with પ્લેટ્સ Column -->
+      <!-- Ledger Table -->
       <div style="margin-bottom:30px;">
-        <div style="border:2px solid #7c3aed;border-radius:8px;overflow:hidden;">
-          <div style="background:#7c3aed;color:white;padding:15px;text-align:center;">
-            <h3 style="margin:0;font-size:20px;font-weight:bold;">TRANSACTION LEDGER / વ્યવહાર ખાતાવહી</h3>
-            <p style="margin:5px 0 0 0;font-size:12px;opacity:0.9;">જમા આગલા દિવસથી અસરકારક / Jama effective from next day</p>
+        <div style="border:2px solid #1e40af;border-radius:8px;overflow:hidden;">
+          <div style="background:#1e40af;color:white;padding:15px;text-align:center;">
+            <h3 style="margin:0;font-size:20px;font-weight:bold;">ખાતાવહી / TRANSACTION LEDGER</h3>
           </div>
           
           <table style="width:100%;border-collapse:collapse;font-size:14px;">
             <thead>
               <tr style="background:#f3f4f6;">
-                <th style="padding:12px;text-align:left;border:1px solid #e5e7eb;font-weight:bold;">Date / તારીખ</th>
+                <th style="padding:12px;text-align:left;border:1px solid #e5e7eb;font-weight:bold;">તારીખ / Date</th>
                 <th style="padding:12px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;">પ્લેટ્સ</th>
-                <th style="padding:12px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;">Udhar / ઉધાર</th>
-                <th style="padding:12px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;">Jama / જમા</th>
-                <th style="padding:12px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;">Balance / બેલેન્સ</th>
-                <th style="padding:12px;text-align:left;border:1px solid #e5e7eb;font-weight:bold;">Challan No.</th>
+                <th style="padding:12px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;">ઉધાર / Udhar</th>
+                <th style="padding:12px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;">જમા / Jama</th>
+                <th style="padding:12px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;">બાકી પ્લેટ્સ</th>
+                <th style="padding:12px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;">દિવસ / Days</th>
+                <th style="padding:12px;text-align:right;border:1px solid #e5e7eb;font-weight:bold;">ભાડું / Rent</th>
+                <th style="padding:12px;text-align:left;border:1px solid #e5e7eb;font-weight:bold;">ચલણ નં.</th>
               </tr>
             </thead>
             <tbody>
               ${data.ledger_entries.map((entry, index) => `
-                <tr style="background:${index % 2 === 0 ? '#f9fafb' : 'white'};">
-                  <td style="padding:10px;border:1px solid #e5e7eb;font-weight:600;">${formatDate(entry.date)}</td>
+                <tr style="background:${index % 2 === 0 ? '#f9fafb' : 'white'};${
+                  entry.entry_type === 'udhar' ? 'border-left:3px solid #dc2626;' : 'border-left:3px solid #059669;'
+                }">
+                  <td style="padding:10px;border:1px solid #e5e7eb;font-weight:600;">${formatGujaratiDate(entry.date)}</td>
                   <td style="padding:10px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;color:#6b7280;">${entry.plates_before}</td>
                   <td style="padding:10px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;color:${entry.udhar > 0 ? '#dc2626' : '#9ca3af'};">${entry.udhar > 0 ? entry.udhar : '-'}</td>
                   <td style="padding:10px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;color:${entry.jama > 0 ? '#059669' : '#9ca3af'};">${entry.jama > 0 ? entry.jama : '-'}</td>
                   <td style="padding:10px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;color:#1e40af;">${entry.balance_after}</td>
+                  <td style="padding:10px;text-align:center;border:1px solid #e5e7eb;font-weight:bold;color:#7c3aed;">${entry.days}</td>
+                  <td style="padding:10px;text-align:right;border:1px solid #e5e7eb;font-weight:bold;color:#dc2626;">${formatCurrency(entry.rent_amount)}</td>
                   <td style="padding:10px;border:1px solid #e5e7eb;font-size:12px;color:#6b7280;">#${entry.challan_number}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <!-- Date Range Billing Table (Handwritten Format) -->
-      <div style="margin-bottom:30px;">
-        <div style="border:2px solid #1e40af;border-radius:8px;overflow:hidden;">
-          <!-- Table Header -->
-          <div style="background:#1e40af;color:white;padding:15px;text-align:center;">
-            <h3 style="margin:0;font-size:20px;font-weight:bold;">RENT CALCULATION / ભાડા ગણતરી</h3>
-            <p style="margin:5px 0 0 0;font-size:12px;opacity:0.9;">Effective Date Based Billing / અસરકારક તારીખ આધારિત બિલિંગ</p>
-          </div>
-          
-          <!-- Billing Table -->
-          <table style="width:100%;border-collapse:collapse;font-size:16px;">
-            <thead>
-              <tr style="background:#f8fafc;">
-                <th style="padding:15px;text-align:left;border:1px solid #e2e8f0;font-weight:bold;">Date Range / તારીખ શ્રેણી</th>
-                <th style="padding:15px;text-align:center;border:1px solid #e2e8f0;font-weight:bold;">Plates / પ્લેટ્સ</th>
-                <th style="padding:15px;text-align:center;border:1px solid #e2e8f0;font-weight:bold;">Days / દિવસ</th>
-                <th style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;">Rent / ભાડો (₹)</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${data.date_ranges.map((range, index) => `
-                <tr style="background:${index % 2 === 0 ? '#f8fafc' : 'white'};">
-                  <td style="padding:12px;border:1px solid #e2e8f0;font-weight:600;">${formatDateRange(range.start_date, range.end_date)}</td>
-                  <td style="padding:12px;text-align:center;border:1px solid #e2e8f0;font-weight:bold;color:#1e40af;">${range.plate_balance}</td>
-                  <td style="padding:12px;text-align:center;border:1px solid #e2e8f0;font-weight:bold;color:#059669;">${range.days}</td>
-                  <td style="padding:12px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#dc2626;">${formatCurrency(range.rent_amount)}</td>
                 </tr>
               `).join('')}
               
               <!-- Subtotal Rent Row -->
               <tr style="background:#e0e7ff;border-top:3px solid #1e40af;">
-                <td colspan="3" style="padding:15px;text-align:right;border:1px solid #1e40af;font-size:18px;font-weight:bold;">Subtotal Rent / પેટા કુલ ભાડો:</td>
+                <td colspan="6" style="padding:15px;text-align:right;border:1px solid #1e40af;font-size:18px;font-weight:bold;">કુલ ભાડું / Subtotal Rent:</td>
                 <td style="padding:15px;text-align:right;border:1px solid #1e40af;font-size:18px;font-weight:bold;color:#dc2626;">${formatCurrency(data.total_rent)}</td>
+                <td style="padding:15px;border:1px solid #1e40af;"></td>
               </tr>
             </tbody>
           </table>
@@ -135,36 +112,36 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
         <div style="border:2px solid #059669;border-radius:8px;overflow:hidden;">
           <!-- Charges Header -->
           <div style="background:#059669;color:white;padding:15px;text-align:center;">
-            <h3 style="margin:0;font-size:20px;font-weight:bold;">CHARGES BREAKDOWN / ચાર્જ વિભાજન</h3>
+            <h3 style="margin:0;font-size:20px;font-weight:bold;">ચાર્જ વિભાજન / CHARGES BREAKDOWN</h3>
           </div>
           
           <!-- Charges Table -->
           <table style="width:100%;border-collapse:collapse;font-size:16px;">
             <tbody>
               <tr style="background:#f0fdf4;">
-                <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">Service Charge (${data.total_plates_issued} × ₹${data.rates.service_charge_rate}):</td>
+                <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">સર્વિસ ચાર્જ / Service Charge (${data.total_plates_issued} × ₹${data.rates.service_charge_rate}):</td>
                 <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#059669;">${formatCurrency(data.service_charge)}</td>
               </tr>
               <tr style="background:white;">
-                <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">Worker/Handling Charge / કામદાર ચાર્જ:</td>
+                <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">મજૂરી ચાર્જ / Worker/Handling Charge:</td>
                 <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#059669;">${formatCurrency(data.worker_charge)}</td>
               </tr>
               ${data.lost_plates_count > 0 ? `
                 <tr style="background:#fef2f2;">
-                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;color:#dc2626;">Lost Plates Penalty (${data.lost_plates_count} × ₹${data.rates.lost_plate_penalty}) / ગુમ પ્લેટ દંડ:</td>
+                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;color:#dc2626;">ગુમ પ્લેટ દંડ / Lost Plates Penalty (${data.lost_plates_count} × ₹${data.rates.lost_plate_penalty}):</td>
                   <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#dc2626;">${formatCurrency(data.lost_plate_penalty)}</td>
                 </tr>
               ` : ''}
               
               <!-- Grand Total Row -->
               <tr style="background:#1e40af;color:white;border-top:3px solid #1e40af;">
-                <td style="padding:20px;border:1px solid #1e40af;font-size:20px;font-weight:bold;">Grand Total / કુલ રકમ:</td>
+                <td style="padding:20px;border:1px solid #1e40af;font-size:20px;font-weight:bold;">કુલ રકમ / Grand Total:</td>
                 <td style="padding:20px;text-align:right;border:1px solid #1e40af;font-size:22px;font-weight:bold;">${formatCurrency(data.grand_total)}</td>
               </tr>
               
               ${data.advance_paid > 0 ? `
                 <tr style="background:#dcfce7;">
-                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;color:#059669;">Advance Paid / અગાઉથી ચૂકવેલ:</td>
+                  <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;color:#059669;">અગાઉથી ચૂકવેલ / Advance Paid:</td>
                   <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#059669;">-${formatCurrency(data.advance_paid)}</td>
                 </tr>
               ` : ''}
@@ -172,7 +149,7 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
               <!-- Final Due Row -->
               <tr style="background:#${data.final_due > 0 ? 'dc2626' : '059669'};color:white;border-top:3px solid #${data.final_due > 0 ? 'dc2626' : '059669'};">
                 <td style="padding:25px;border:1px solid #${data.final_due > 0 ? 'dc2626' : '059669'};font-size:24px;font-weight:bold;">
-                  ${data.final_due > 0 ? 'FINAL DUE / અંતિમ બાકી:' : 'FULLY PAID / સંપૂર્ણ ચૂકવણી:'}
+                  ${data.final_due > 0 ? 'અંતિમ બાકી / FINAL DUE:' : 'સંપૂર્ણ ચૂકવણી / FULLY PAID:'}
                 </td>
                 <td style="padding:25px;text-align:right;border:1px solid #${data.final_due > 0 ? 'dc2626' : '059669'};font-size:28px;font-weight:bold;">
                   ${data.final_due > 0 ? formatCurrency(data.final_due) : '₹0.00'}
@@ -185,13 +162,15 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
 
       <!-- Billing Rules Explanation -->
       <div style="margin-bottom:20px;background:#fef3c7;padding:15px;border-radius:8px;border-left:4px solid #f59e0b;">
-        <h4 style="margin:0 0 10px 0;font-size:16px;color:#92400e;font-weight:bold;">Billing Rules / બિલિંગ નિયમો:</h4>
+        <h4 style="margin:0 0 10px 0;font-size:16px;color:#92400e;font-weight:bold;">બિલિંગ નિયમો / Billing Rules:</h4>
         <ul style="margin:0;padding-left:20px;font-size:14px;color:#92400e;">
           <li>ઉધાર (Udhar): Same day effective / તે જ દિવસે અસરકારક</li>
           <li>જમા (Jama): Next day effective / આગલા દિવસે અસરકારક</li>
           <li>Rate: ₹${data.rates.daily_rent_rate}/plate/day</li>
+          <li>First issue date = Day 1 / પ્રથમ ઉધાર તારીખ = દિવસ 1</li>
         </ul>
       </div>
+
       <!-- Footer -->
       <div style="margin-top:40px;text-align:center;border-top:3px solid #1e40af;padding-top:25px;">
         <div style="font-size:28px;font-weight:bold;color:#1e40af;margin-bottom:15px;">આભાર! ફરી મળીએ.</div>
@@ -199,8 +178,7 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
           સુરેશભાઈ પોલરા: +91 93287 28228 | હરેશભાઈ પોલરા: +91 90992 64436
         </div>
         <div style="font-size:14px;color:#999;margin-top:15px;">
-        Generated: ${new Date().toLocaleString('en-IN')} | NO WERE TECH Comprehensive Billing System
-        </div>
+          Generated: ${new Date().toLocaleString('en-IN')} | NO WERE TECH Gujarati Billing System
         </div>
       </div>
     </div>
@@ -227,7 +205,7 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
   }
 };
 
-export const downloadComprehensiveBillJPG = (dataUrl: string, filename: string) => {
+export const downloadGujaratiBillJPG = (dataUrl: string, filename: string) => {
   try {
     const link = document.createElement('a');
     link.download = `${filename}.jpg`;

@@ -9,27 +9,19 @@ import {
   User, 
   Calendar, 
   DollarSign,
+  Plus,
+  Minus,
+  FileText,
+  Lock,
   Settings,
-  Loader2,
-  TrendingUp,
-  Package,
-  AlertTriangle,
-  CheckCircle,
-  Lock
+  Loader2
 } from 'lucide-react';
-import { 
-  ComprehensiveBillingCalculator, 
-  ComprehensiveBillData, 
-  BillingRates 
-} from '../../utils/comprehensiveBillingCalculator';
-import { 
-  generateComprehensiveBillJPG, 
-  downloadComprehensiveBillJPG 
-} from '../../utils/comprehensiveBillJPGGenerator';
+import { SimpleBillingCalculator, SimpleBillData, ExtraCharge, Discount } from '../../utils/simpleBillingCalculator';
+import { generateSimpleBillJPG, downloadSimpleBillJPG } from '../../utils/simpleBillJPGGenerator';
 
 type Client = Database['public']['Tables']['clients']['Row'];
 
-export function ComprehensiveBillManagement() {
+export function SimpleBillManagement() {
   const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -42,21 +34,15 @@ export function ComprehensiveBillManagement() {
   const [billDate, setBillDate] = useState(new Date().toISOString().split('T')[0]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [advancePaid, setAdvancePaid] = useState(0);
-  
-  // Billing rates
-  const [rates, setRates] = useState<BillingRates>({
-    daily_rent_rate: 1.00,
-    service_charge_rate: 7.00,
-    worker_charge: 100.00,
-    lost_plate_penalty: 250.00
-  });
+  const [ratePerDay, setRatePerDay] = useState(1.00);
+  const [extraCharges, setExtraCharges] = useState<ExtraCharge[]>([]);
+  const [discounts, setDiscounts] = useState<Discount[]>([]);
   
   // Calculation results
-  const [billData, setBillData] = useState<ComprehensiveBillData | null>(null);
+  const [billData, setBillData] = useState<SimpleBillData | null>(null);
   const [billNumber, setBillNumber] = useState('');
 
-  const calculator = new ComprehensiveBillingCalculator(rates);
+  const calculator = new SimpleBillingCalculator();
 
   useEffect(() => {
     fetchClients();
@@ -103,13 +89,14 @@ export function ComprehensiveBillManagement() {
         endDate || billDate
       );
 
-      const calculatedBill = calculator.calculateComprehensiveBilling(
+      const calculatedBill = calculator.calculateSimpleBilling(
         selectedClient,
         challans,
         returns,
         billDate,
-        rates,
-        advancePaid
+        ratePerDay,
+        extraCharges,
+        discounts
       );
 
       calculatedBill.bill_number = billNumber;
@@ -127,13 +114,14 @@ export function ComprehensiveBillManagement() {
 
     setGenerating(true);
     try {
-      const jpgDataUrl = await generateComprehensiveBillJPG(billData);
-      downloadComprehensiveBillJPG(jpgDataUrl, `comprehensive-bill-${billData.client.id}-${billData.bill_date}`);
+      const jpgDataUrl = await generateSimpleBillJPG(billData, extraCharges, discounts);
+      downloadSimpleBillJPG(jpgDataUrl, `bill-${billData.client.id}-${billData.bill_date}`);
       
       // Reset form after successful generation
       setSelectedClient(null);
       setBillData(null);
-      setAdvancePaid(0);
+      setExtraCharges([]);
+      setDiscounts([]);
       await generateBillNumber();
       
       alert('બિલ સફળતાપૂર્વક જનરેટ અને ડાઉનલોડ થયું!');
@@ -145,8 +133,32 @@ export function ComprehensiveBillManagement() {
     }
   };
 
-  const updateRate = (field: keyof BillingRates, value: number) => {
-    setRates(prev => ({ ...prev, [field]: value }));
+  const addExtraCharge = () => {
+    setExtraCharges([...extraCharges, { description: '', amount: 0 }]);
+  };
+
+  const updateExtraCharge = (index: number, field: keyof ExtraCharge, value: string | number) => {
+    const updated = [...extraCharges];
+    updated[index] = { ...updated[index], [field]: value };
+    setExtraCharges(updated);
+  };
+
+  const removeExtraCharge = (index: number) => {
+    setExtraCharges(extraCharges.filter((_, i) => i !== index));
+  };
+
+  const addDiscount = () => {
+    setDiscounts([...discounts, { description: '', amount: 0 }]);
+  };
+
+  const updateDiscount = (index: number, field: keyof Discount, value: string | number) => {
+    const updated = [...discounts];
+    updated[index] = { ...updated[index], [field]: value };
+    setDiscounts(updated);
+  };
+
+  const removeDiscount = (index: number) => {
+    setDiscounts(discounts.filter((_, i) => i !== index));
   };
 
   const filteredClients = clients.filter(client =>
@@ -206,8 +218,8 @@ export function ComprehensiveBillManagement() {
           <div className="inline-flex items-center justify-center w-10 h-10 mb-2 rounded-full shadow-lg bg-gradient-to-r from-blue-600 to-indigo-600">
             <Calculator className="w-5 h-5 text-white" />
           </div>
-          <h1 className="mb-1 text-base font-bold text-gray-900">કમ્પ્રીહેન્સિવ બિલિંગ</h1>
-          <p className="text-xs text-blue-600">હેન્ડરાઇટન બિલ ફોર્મેટ</p>
+          <h1 className="mb-1 text-base font-bold text-gray-900">બિલિંગ</h1>
+          <p className="text-xs text-blue-600">તારીખ આધારિત ભાડા ગણતરી</p>
         </div>
 
         {/* Client Selection */}
@@ -319,16 +331,16 @@ export function ComprehensiveBillManagement() {
 
               <div>
                 <label className="block mb-1 text-xs font-medium text-gray-700">
-                  અગાઉથી ચૂકવેલ રકમ (₹)
+                  દર પ્રતિ પ્લેટ પ્રતિ દિવસ (₹)
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
-                  value={advancePaid}
-                  onChange={(e) => setAdvancePaid(parseFloat(e.target.value) || 0)}
+                  value={ratePerDay}
+                  onChange={(e) => setRatePerDay(parseFloat(e.target.value) || 0)}
                   className="w-full px-3 py-2 text-sm border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                  placeholder="0.00"
+                  placeholder="1.00"
                 />
               </div>
 
@@ -353,73 +365,104 @@ export function ComprehensiveBillManagement() {
           </div>
         )}
 
-        {/* Billing Rates Configuration */}
-        {selectedClient && (
-          <div className="overflow-hidden bg-white border-2 border-purple-100 shadow-lg rounded-xl">
-            <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500">
-              <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-                <DollarSign className="w-4 h-4" />
-                બિલિંગ દરો
-              </h3>
-            </div>
-            
-            <div className="p-3 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block mb-1 text-xs font-medium text-gray-700">
-                    દૈનિક ભાડો દર (₹/પ્લેટ/દિવસ)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={rates.daily_rent_rate}
-                    onChange={(e) => updateRate('daily_rent_rate', parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 text-sm border-2 border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-100 focus:border-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block mb-1 text-xs font-medium text-gray-700">
-                    સર્વિસ ચાર્જ દર (₹/પ્લેટ)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={rates.service_charge_rate}
-                    onChange={(e) => updateRate('service_charge_rate', parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 text-sm border-2 border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-100 focus:border-purple-500"
-                  />
+        {/* Extra Charges and Discounts */}
+        {billData && (
+          <div className="space-y-3">
+            {/* Extra Charges */}
+            <div className="overflow-hidden bg-white border-2 border-yellow-100 shadow-lg rounded-xl">
+              <div className="p-3 bg-gradient-to-r from-yellow-500 to-orange-500">
+                <div className="flex items-center justify-between">
+                  <h3 className="flex items-center gap-2 text-sm font-bold text-white">
+                    <Plus className="w-4 h-4" />
+                    વધારાના ચાર્જ
+                  </h3>
+                  <button
+                    onClick={addExtraCharge}
+                    className="p-1 text-white rounded hover:bg-yellow-400/20"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
+              
+              <div className="p-3 space-y-2">
+                {extraCharges.map((charge, index) => (
+                  <div key={index} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={charge.description}
+                      onChange={(e) => updateExtraCharge(index, 'description', e.target.value)}
+                      className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded"
+                      placeholder="વર્ણન"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={charge.amount}
+                      onChange={(e) => updateExtraCharge(index, 'amount', parseFloat(e.target.value) || 0)}
+                      className="w-20 px-2 py-1 text-xs border border-gray-300 rounded"
+                      placeholder="રકમ"
+                    />
+                    <button
+                      onClick={() => removeExtraCharge(index)}
+                      className="p-1 text-red-600 rounded hover:bg-red-50"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                {extraCharges.length === 0 && (
+                  <p className="py-2 text-xs text-center text-gray-500">કોઈ વધારાના ચાર્જ નથી</p>
+                )}
+              </div>
+            </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block mb-1 text-xs font-medium text-gray-700">
-                    કામદાર ચાર્જ (₹)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={rates.worker_charge}
-                    onChange={(e) => updateRate('worker_charge', parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 text-sm border-2 border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-100 focus:border-purple-500"
-                  />
+            {/* Discounts */}
+            <div className="overflow-hidden bg-white border-2 border-green-100 shadow-lg rounded-xl">
+              <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500">
+                <div className="flex items-center justify-between">
+                  <h3 className="flex items-center gap-2 text-sm font-bold text-white">
+                    <Minus className="w-4 h-4" />
+                    ડિસ્કાઉન્ટ
+                  </h3>
+                  <button
+                    onClick={addDiscount}
+                    className="p-1 text-white rounded hover:bg-green-400/20"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
                 </div>
-                <div>
-                  <label className="block mb-1 text-xs font-medium text-gray-700">
-                    ગુમ પ્લેટ દંડ (₹/પ્લેટ)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={rates.lost_plate_penalty}
-                    onChange={(e) => updateRate('lost_plate_penalty', parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 text-sm border-2 border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-100 focus:border-purple-500"
-                  />
-                </div>
+              </div>
+              
+              <div className="p-3 space-y-2">
+                {discounts.map((discount, index) => (
+                  <div key={index} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={discount.description}
+                      onChange={(e) => updateDiscount(index, 'description', e.target.value)}
+                      className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded"
+                      placeholder="વર્ણન"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={discount.amount}
+                      onChange={(e) => updateDiscount(index, 'amount', parseFloat(e.target.value) || 0)}
+                      className="w-20 px-2 py-1 text-xs border border-gray-300 rounded"
+                      placeholder="રકમ"
+                    />
+                    <button
+                      onClick={() => removeDiscount(index)}
+                      className="p-1 text-red-600 rounded hover:bg-red-50"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                {discounts.length === 0 && (
+                  <p className="py-2 text-xs text-center text-gray-500">કોઈ ડિસ્કાઉન્ટ નથી</p>
+                )}
               </div>
             </div>
           </div>
@@ -427,93 +470,64 @@ export function ComprehensiveBillManagement() {
 
         {/* Bill Preview */}
         {billData && (
-          <div className="overflow-hidden bg-white border-2 border-green-100 shadow-lg rounded-xl">
-            <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500">
+          <div className="overflow-hidden bg-white border-2 border-purple-100 shadow-lg rounded-xl">
+            <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500">
               <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-                <TrendingUp className="w-4 h-4" />
+                <FileText className="w-4 h-4" />
                 બિલ પ્રીવ્યૂ
               </h3>
             </div>
             
             <div className="p-3 space-y-3">
-              {/* Date Range Breakdown */}
-              <div className="overflow-x-auto">
-                {/* Ledger Entries Table with પ્લેટ્સ Column */}
-                <div className="mb-4">
-                  <h4 className="flex items-center gap-2 mb-2 text-sm font-bold text-purple-800">
-                    <Package className="w-4 h-4" />
-                    Transaction Ledger / વ્યવહાર ખાતાવહી
-                  </h4>
-                  <div className="p-2 mb-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded">
-                    <strong>Rule:</strong> જમા આગલા દિવસથી અસરકારક (Jama effective from next day)
-                  </div>
-                  <table className="w-full text-xs border border-gray-200 rounded">
-                    <thead>
-                      <tr className="text-white bg-gradient-to-r from-purple-500 to-violet-500">
-                        <th className="px-2 py-1 text-left">Date</th>
-                        <th className="px-2 py-1 text-center">પ્લેટ્સ</th>
-                        <th className="px-2 py-1 text-center">Udhar</th>
-                        <th className="px-2 py-1 text-center">Jama</th>
-                        <th className="px-2 py-1 text-center">Balance</th>
-                        <th className="px-2 py-1 text-left">Challan</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {billData.ledger_entries.map((entry, index) => (
-                        <tr key={index} className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} ${
-                          entry.entry_type === 'udhar' ? 'border-l-2 border-red-300' : 'border-l-2 border-green-300'
-                        }`}>
-                          <td className="px-2 py-1 font-medium">
-                            {new Date(entry.date).toLocaleDateString('en-GB')}
-                          </td>
-                          <td className="px-2 py-1 font-bold text-center text-gray-600">
-                            {entry.plates_before}
-                          </td>
-                          <td className="px-2 py-1 font-bold text-center text-red-600">
-                            {entry.udhar > 0 ? entry.udhar : '-'}
-                          </td>
-                          <td className="px-2 py-1 font-bold text-center text-green-600">
-                            {entry.jama > 0 ? entry.jama : '-'}
-                          </td>
-                          <td className="px-2 py-1 font-bold text-center text-blue-600">
-                            {entry.balance_after}
-                          </td>
-                          <td className="px-2 py-1 text-xs text-gray-500">
-                            #{entry.challan_number}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              {/* Summary Stats */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="p-2 text-center border border-blue-200 rounded bg-blue-50">
+                  <div className="text-lg font-bold text-blue-700">{billData.total_days}</div>
+                  <div className="text-xs text-blue-600">કુલ દિવસ</div>
                 </div>
+                <div className="p-2 text-center border border-green-200 rounded bg-green-50">
+                  <div className="text-lg font-bold text-green-700">
+                    {Math.round(billData.total_plates / (billData.daily_balances.filter(d => d.days_count > 0).length || 1))}
+                  </div>
+                  <div className="text-xs text-green-600">સરેરાશ પ્લેટ</div>
+                </div>
+                <div className="p-2 text-center border border-purple-200 rounded bg-purple-50">
+                  <div className="text-lg font-bold text-purple-700">
+                    ₹{billData.grand_total.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-purple-600">કુલ રકમ</div>
+                </div>
+              </div>
 
-                {/* Date Range Billing Table */}
+              {/* Daily Breakdown Table */}
+              <div className="overflow-x-auto">
                 <table className="w-full text-xs border border-gray-200 rounded">
                   <thead>
                     <tr className="text-white bg-gradient-to-r from-blue-500 to-indigo-500">
-                      <th className="px-2 py-1 text-left">તારીખ શ્રેણી</th>
-                      <th className="px-2 py-1 text-center">પ્લેટ્સ</th>
-                      <th className="px-2 py-1 text-center">દિવસ</th>
-                      <th className="px-2 py-1 text-center">ભાડો</th>
+                      <th className="px-2 py-1 text-left">તારીખ</th>
+                      <th className="px-2 py-1 text-center">પ્લેટ બેલેન્સ</th>
+                      <th className="px-2 py-1 text-center">દિવસ ગણતરી</th>
+                      <th className="px-2 py-1 text-center">રકમ</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {billData.date_ranges.map((range, index) => (
+                    {billData.daily_balances.map((day, index) => (
                       <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                         <td className="px-2 py-1 font-medium">
-                          {range.start_date === range.end_date 
-                            ? new Date(range.start_date).toLocaleDateString('en-GB')
-                            : `${new Date(range.start_date).toLocaleDateString('en-GB')} – ${new Date(range.end_date).toLocaleDateString('en-GB')}`
-                          }
+                          {new Date(day.date).toLocaleDateString('en-GB')}
                         </td>
                         <td className="px-2 py-1 font-bold text-center text-blue-600">
-                          {range.plate_balance}
+                          {day.plate_balance}
                         </td>
-                        <td className="px-2 py-1 font-bold text-center text-green-600">
-                          {range.days}
+                        <td className="px-2 py-1 font-bold text-center">
+                          <span className={day.days_count === 0 ? 'text-gray-500' : 'text-green-600'}>
+                            {day.days_count}
+                          </span>
                         </td>
-                        <td className="px-2 py-1 font-bold text-center text-purple-600">
-                          ₹{range.rent_amount.toFixed(2)}
+                        <td className="px-2 py-1 font-bold text-center">
+                          <span className={day.amount === 0 ? 'text-gray-500' : 'text-purple-600'}>
+                            ₹{day.amount.toFixed(2)}
+                          </span>
                         </td>
                       </tr>
                     ))}
@@ -521,51 +535,11 @@ export function ComprehensiveBillManagement() {
                 </table>
               </div>
 
-              {/* Charges Summary */}
-              <div className="p-3 border border-gray-200 rounded bg-gray-50">
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span>Subtotal Rent:</span>
-                    <span className="font-bold">₹{billData.total_rent.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Service Charge ({billData.total_plates_issued} × ₹{billData.rates.service_charge_rate}):</span>
-                    <span className="font-bold">₹{billData.service_charge.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Worker Charge:</span>
-                    <span className="font-bold">₹{billData.worker_charge.toFixed(2)}</span>
-                  </div>
-                  {billData.lost_plates_count > 0 && (
-                    <div className="flex justify-between text-red-600">
-                      <span>Lost Plates ({billData.lost_plates_count} × ₹{billData.rates.lost_plate_penalty}):</span>
-                      <span className="font-bold">₹{billData.lost_plate_penalty.toFixed(2)}</span>
-                    </div>
-                  )}
-                  <hr className="border-gray-300" />
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>Grand Total:</span>
-                    <span>₹{billData.grand_total.toFixed(2)}</span>
-                  </div>
-                  {billData.advance_paid > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span>Advance Paid:</span>
-                      <span className="font-bold">-₹{billData.advance_paid.toFixed(2)}</span>
-                    </div>
-                  )}
-                  <hr className="border-gray-300" />
-                  <div className={`flex justify-between text-xl font-bold ${billData.final_due > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    <span>FINAL DUE:</span>
-                    <span>₹{billData.final_due.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-
               {/* Generate Bill Button */}
               <button
                 onClick={handleGenerateBill}
                 disabled={generating}
-                className="flex items-center justify-center w-full gap-2 py-3 text-sm font-medium text-white transition-all duration-200 transform rounded-lg shadow-lg bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 hover:shadow-xl hover:scale-105 disabled:opacity-50"
+                className="flex items-center justify-center w-full gap-2 py-3 text-sm font-medium text-white transition-all duration-200 transform rounded-lg shadow-lg bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 hover:shadow-xl hover:scale-105 disabled:opacity-50"
               >
                 {generating ? (
                   <>
@@ -575,7 +549,7 @@ export function ComprehensiveBillManagement() {
                 ) : (
                   <>
                     <Download className="w-4 h-4" />
-                    કમ્પ્રીહેન્સિવ બિલ જનરેટ કરો
+                    બિલ જનરેટ કરો અને ડાઉનલોડ કરો
                   </>
                 )}
               </button>

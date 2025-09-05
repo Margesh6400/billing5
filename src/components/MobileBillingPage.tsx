@@ -480,8 +480,7 @@ export function ComprehensiveBillManagement() {
           <div className="overflow-hidden bg-white border-2 border-purple-100 shadow-lg rounded-xl">
             <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500">
               <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-                <DollarSign className="w-4 h-4" />
-                બિલિંગ દરો
+                ₹ બિલિંગ દરો
               </h3>
             </div>
             
@@ -489,7 +488,7 @@ export function ComprehensiveBillManagement() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block mb-1 text-xs font-medium text-gray-700">
-                    દૈનિક ભાડો દર (₹/પ્લેટ/દિવસ)
+                    દૈનિક ભાડો (પ્લેટ/દિવસ)
                   </label>
                   <input
                     type="number"
@@ -502,7 +501,7 @@ export function ComprehensiveBillManagement() {
                 </div>
                 <div>
                   <label className="block mb-1 text-xs font-medium text-gray-700">
-                    સર્વિસ ચાર્જ (₹/પ્લેટ)
+                    સર્વિસ ચાર્જ 
                   </label>
                   <input
                     type="number"
@@ -654,6 +653,12 @@ export function ComprehensiveBillManagement() {
               {payments.map((payment, index) => (
                 <div key={index} className="flex items-center gap-1.5 text-xs">
                   <div className="flex-1 flex items-center gap-1.5">
+                    <input
+                      type="date"
+                      value={payment.date}
+                      onChange={(e) => updatePayment(index, 'date', e.target.value)}
+                      className="w-28 px-1.5 py-0.5 border border-purple-200 rounded bg-white"
+                    />
                     <input
                       type="text"
                       placeholder="નોંધ"

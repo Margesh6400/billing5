@@ -520,40 +520,32 @@ export function ComprehensiveBillManagement() {
 
         {/* Extra Charges Section */}
         {selectedClient && (
-          <div className="overflow-hidden bg-white border-2 border-orange-100 shadow-lg rounded-xl">
-            <div className="p-3 bg-gradient-to-r from-orange-500 to-amber-500">
-              <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-                <Plus className="w-4 h-4" />
+          <div className="overflow-hidden bg-white border border-orange-100 rounded-lg shadow-sm">
+            <div className="p-2 bg-gradient-to-r from-orange-500 to-amber-500">
+              <h3 className="flex items-center gap-1.5 text-xs font-bold text-white">
+                <Plus className="w-3.5 h-3.5" />
                 વધારાના ચાર્જ
               </h3>
             </div>
             
-            <div className="p-3 space-y-3">
+            <div className="p-2 space-y-2">
               {extraCharges.map((charge, index) => (
-                <div key={index} className="p-2 border border-orange-200 rounded-lg bg-orange-50">
-                  <div className="grid grid-cols-2 gap-2 mb-2">
+                <div key={index} className="flex items-center gap-2 p-1.5 border border-orange-100 rounded bg-orange-50">
+                  <div className="flex-1 grid grid-cols-4 gap-1.5 items-center text-xs">
                     <input
                       type="text"
                       placeholder="નોંધ"
                       value={charge.note}
                       onChange={(e) => updateExtraCharge(index, 'note', e.target.value)}
-                      className="px-2 py-1 text-xs border border-orange-300 rounded"
+                      className="col-span-2 px-1.5 py-0.5 border border-orange-200 rounded"
                     />
-                    <input
-                      type="date"
-                      value={charge.date}
-                      onChange={(e) => updateExtraCharge(index, 'date', e.target.value)}
-                      className="px-2 py-1 text-xs border border-orange-300 rounded"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mb-2">
                     <input
                       type="number"
                       placeholder="સંખ્યા"
                       min="1"
                       value={charge.item_count}
                       onChange={(e) => updateExtraCharge(index, 'item_count', parseInt(e.target.value) || 1)}
-                      className="px-2 py-1 text-xs border border-orange-300 rounded"
+                      className="px-1.5 py-0.5 border border-orange-200 rounded"
                     />
                     <input
                       type="number"
@@ -562,26 +554,21 @@ export function ComprehensiveBillManagement() {
                       min="0"
                       value={charge.price}
                       onChange={(e) => updateExtraCharge(index, 'price', parseFloat(e.target.value) || 0)}
-                      className="px-2 py-1 text-xs border border-orange-300 rounded"
+                      className="px-1.5 py-0.5 border border-orange-200 rounded"
                     />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-orange-700">
-                      કુલ: ₹{charge.total.toFixed(2)}
-                    </span>
-                    <button
-                      onClick={() => removeExtraCharge(index)}
-                      className="px-2 py-1 text-xs text-red-600 rounded hover:bg-red-100"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => removeExtraCharge(index)}
+                    className="p-1 text-red-500 rounded hover:bg-red-50"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
                 </div>
               ))}
               
               <button
                 onClick={addExtraCharge}
-                className="w-full py-2 text-xs font-medium text-orange-600 border border-orange-300 rounded-lg hover:bg-orange-50"
+                className="w-full py-1.5 text-xs font-medium text-orange-600 border border-orange-200 rounded hover:bg-orange-50"
               >
                 + વધારાનો ચાર્જ ઉમેરો
               </button>
@@ -591,40 +578,32 @@ export function ComprehensiveBillManagement() {
 
         {/* Discounts Section */}
         {selectedClient && (
-          <div className="overflow-hidden bg-white border-2 border-green-100 shadow-lg rounded-xl">
-            <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500">
-              <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-                <TrendingUp className="w-4 h-4" />
+          <div className="overflow-hidden bg-white border border-green-100 rounded-lg shadow-sm">
+            <div className="p-2 bg-gradient-to-r from-green-500 to-emerald-500">
+              <h3 className="flex items-center gap-1.5 text-xs font-bold text-white">
+                <TrendingUp className="w-3.5 h-3.5" />
                 ડિસ્કાઉન્ટ
               </h3>
             </div>
             
-            <div className="p-3 space-y-3">
+            <div className="p-2 space-y-2">
               {discounts.map((discount, index) => (
-                <div key={index} className="p-2 border border-green-200 rounded-lg bg-green-50">
-                  <div className="grid grid-cols-2 gap-2 mb-2">
+                <div key={index} className="flex items-center gap-2 p-1.5 border border-green-100 rounded bg-green-50">
+                  <div className="flex-1 grid grid-cols-4 gap-1.5 items-center text-xs">
                     <input
                       type="text"
                       placeholder="નોંધ"
                       value={discount.note}
                       onChange={(e) => updateDiscount(index, 'note', e.target.value)}
-                      className="px-2 py-1 text-xs border border-green-300 rounded"
+                      className="col-span-2 px-1.5 py-0.5 border border-green-200 rounded"
                     />
-                    <input
-                      type="date"
-                      value={discount.date}
-                      onChange={(e) => updateDiscount(index, 'date', e.target.value)}
-                      className="px-2 py-1 text-xs border border-green-300 rounded"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mb-2">
                     <input
                       type="number"
                       placeholder="સંખ્યા"
                       min="1"
                       value={discount.item_count}
                       onChange={(e) => updateDiscount(index, 'item_count', parseInt(e.target.value) || 1)}
-                      className="px-2 py-1 text-xs border border-green-300 rounded"
+                      className="px-1.5 py-0.5 border border-green-200 rounded"
                     />
                     <input
                       type="number"
@@ -633,26 +612,21 @@ export function ComprehensiveBillManagement() {
                       min="0"
                       value={discount.price}
                       onChange={(e) => updateDiscount(index, 'price', parseFloat(e.target.value) || 0)}
-                      className="px-2 py-1 text-xs border border-green-300 rounded"
+                      className="px-1.5 py-0.5 border border-green-200 rounded"
                     />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-green-700">
-                      કુલ: ₹{discount.total.toFixed(2)}
-                    </span>
-                    <button
-                      onClick={() => removeDiscount(index)}
-                      className="px-2 py-1 text-xs text-red-600 rounded hover:bg-red-100"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => removeDiscount(index)}
+                    className="p-1 text-red-500 rounded hover:bg-red-50"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
                 </div>
               ))}
               
               <button
                 onClick={addDiscount}
-                className="w-full py-2 text-xs font-medium text-green-600 border border-green-300 rounded-lg hover:bg-green-50"
+                className="w-full py-1.5 text-xs font-medium text-green-600 border border-green-200 rounded hover:bg-green-50"
               >
                 + ડિસ્કાઉન્ટ ઉમેરો
               </button>
@@ -662,60 +636,47 @@ export function ComprehensiveBillManagement() {
 
         {/* Payments Section */}
         {selectedClient && (
-          <div className="overflow-hidden bg-white border-2 border-purple-100 shadow-lg rounded-xl">
-            <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500">
-              <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-                <Calculator className="w-4 h-4" />
+          <div className="overflow-hidden bg-white border border-purple-100 rounded-lg shadow-sm">
+            <div className="p-2 bg-gradient-to-r from-purple-500 to-violet-500">
+              <h3 className="flex items-center gap-1.5 text-xs font-bold text-white">
+                <Calculator className="w-3.5 h-3.5" />
                 ચુકવણી
               </h3>
             </div>
             
-            <div className="p-3 space-y-3">
+            <div className="p-2 space-y-2">
               {payments.map((payment, index) => (
-                <div key={index} className="p-2 border border-purple-200 rounded-lg bg-purple-50">
-                  <div className="grid grid-cols-2 gap-2 mb-2">
+                <div key={index} className="flex items-center gap-2 p-1.5 border border-purple-100 rounded bg-purple-50">
+                  <div className="flex-1 grid grid-cols-4 gap-1.5 items-center text-xs">
                     <input
                       type="text"
                       placeholder="નોંધ"
                       value={payment.note}
                       onChange={(e) => updatePayment(index, 'note', e.target.value)}
-                      className="px-2 py-1 text-xs border border-purple-300 rounded"
+                      className="col-span-2 px-1.5 py-0.5 border border-purple-200 rounded"
                     />
-                    <input
-                      type="date"
-                      value={payment.date}
-                      onChange={(e) => updatePayment(index, 'date', e.target.value)}
-                      className="px-2 py-1 text-xs border border-purple-300 rounded"
-                    />
-                  </div>
-                  <div className="mb-2">
                     <input
                       type="number"
-                      placeholder="ચુકવણી રકમ"
+                      placeholder="રકમ"
                       step="0.01"
                       min="0"
                       value={payment.payment_amount}
                       onChange={(e) => updatePayment(index, 'payment_amount', parseFloat(e.target.value) || 0)}
-                      className="w-full px-2 py-1 text-xs border border-purple-300 rounded"
+                      className="col-span-2 px-1.5 py-0.5 border border-purple-200 rounded"
                     />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-purple-700">
-                      રકમ: ₹{payment.payment_amount.toFixed(2)}
-                    </span>
-                    <button
-                      onClick={() => removePayment(index)}
-                      className="px-2 py-1 text-xs text-red-600 rounded hover:bg-red-100"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => removePayment(index)}
+                    className="p-1 text-red-500 rounded hover:bg-red-50"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
                 </div>
               ))}
               
               <button
                 onClick={addPayment}
-                className="w-full py-2 text-xs font-medium text-purple-600 border border-purple-300 rounded-lg hover:bg-purple-50"
+                className="w-full py-1.5 text-xs font-medium text-purple-600 border border-purple-200 rounded hover:bg-purple-50"
               >
                 + ચુકવણી ઉમેરો
               </button>
@@ -725,15 +686,15 @@ export function ComprehensiveBillManagement() {
 
         {/* Bill Preview */}
         {billData && (
-          <div className="overflow-hidden bg-white border-2 border-green-100 shadow-lg rounded-xl">
-            <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500">
-              <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-                <TrendingUp className="w-4 h-4" />
+          <div className="overflow-hidden bg-white border border-green-100 rounded-lg shadow-sm">
+            <div className="p-2 bg-gradient-to-r from-green-500 to-emerald-500">
+              <h3 className="flex items-center gap-1.5 text-xs font-bold text-white">
+                <TrendingUp className="w-3.5 h-3.5" />
                 બિલ પ્રીવ્યૂ
               </h3>
             </div>
             
-            <div className="p-3 space-y-3">
+            <div className="p-2 space-y-2">
               {/* Ledger Entries Table */}
               <div className="mb-4">
                 <h4 className="flex items-center gap-2 mb-2 text-sm font-bold text-purple-800">
@@ -1007,7 +968,7 @@ export function ComprehensiveBillManagement() {
                 ) : (
                   <>
                     <Download className="w-4 h-4" />
-                    કમ્પ્રીહેન્સિવ બિલ જનરેટ કરો
+                    બિલ જનરેટ કરો
                   </>
                 )}
               </button>

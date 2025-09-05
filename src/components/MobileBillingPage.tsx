@@ -445,7 +445,7 @@ export function ComprehensiveBillManagement() {
                 </label>
                 <input
                   type="number"
-                  step="0.01"
+                  step="1"
                   min="0"
                   value={advancePaid}
                   onChange={(e) => setAdvancePaid(parseFloat(e.target.value) || 0)}
@@ -493,7 +493,7 @@ export function ComprehensiveBillManagement() {
                   </label>
                   <input
                     type="number"
-                    step="0.01"
+                    step="1"
                     min="0"
                     value={rates.daily_rent_rate}
                     onChange={(e) => updateRate('daily_rent_rate', parseFloat(e.target.value) || 0)}
@@ -506,7 +506,7 @@ export function ComprehensiveBillManagement() {
                   </label>
                   <input
                     type="number"
-                    step="0.1"
+                    step="1"
                     min="0"
                     value={serviceRatePerPlate}
                     onChange={(e) => setServiceRatePerPlate(parseFloat(e.target.value) || 0)}
@@ -530,36 +530,39 @@ export function ComprehensiveBillManagement() {
             
             <div className="p-2 space-y-2">
               {extraCharges.map((charge, index) => (
-                <div key={index} className="flex items-center gap-2 p-1.5 border border-orange-100 rounded bg-orange-50">
-                  <div className="flex-1 grid grid-cols-4 gap-1.5 items-center text-xs">
+                <div key={index} className="flex items-center gap-1.5 text-xs">
+                  <div className="flex-1 flex items-center gap-1.5">
                     <input
                       type="text"
                       placeholder="નોંધ"
                       value={charge.note}
                       onChange={(e) => updateExtraCharge(index, 'note', e.target.value)}
-                      className="col-span-2 px-1.5 py-0.5 border border-orange-200 rounded"
+                      className="w-32 px-1.5 py-0.5 border border-orange-200 rounded bg-white"
                     />
+                    <span className="text-gray-400">×</span>
                     <input
                       type="number"
                       placeholder="સંખ્યા"
                       min="1"
                       value={charge.item_count}
                       onChange={(e) => updateExtraCharge(index, 'item_count', parseInt(e.target.value) || 1)}
-                      className="px-1.5 py-0.5 border border-orange-200 rounded"
+                      className="w-14 px-1.5 py-0.5 border border-orange-200 rounded bg-white"
                     />
+                    <span className="text-gray-400">×</span>
                     <input
                       type="number"
                       placeholder="કિંમત"
-                      step="0.01"
+                      step="1"
                       min="0"
                       value={charge.price}
                       onChange={(e) => updateExtraCharge(index, 'price', parseFloat(e.target.value) || 0)}
-                      className="px-1.5 py-0.5 border border-orange-200 rounded"
+                      className="w-16 px-1.5 py-0.5 border border-orange-200 rounded bg-white"
                     />
+                    <span className="font-medium text-orange-600">= ₹{charge.total}</span>
                   </div>
                   <button
                     onClick={() => removeExtraCharge(index)}
-                    className="p-1 text-red-500 rounded hover:bg-red-50"
+                    className="p-0.5 text-red-500 rounded hover:bg-red-50"
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -588,36 +591,39 @@ export function ComprehensiveBillManagement() {
             
             <div className="p-2 space-y-2">
               {discounts.map((discount, index) => (
-                <div key={index} className="flex items-center gap-2 p-1.5 border border-green-100 rounded bg-green-50">
-                  <div className="flex-1 grid grid-cols-4 gap-1.5 items-center text-xs">
+                <div key={index} className="flex items-center gap-1.5 text-xs">
+                  <div className="flex-1 flex items-center gap-1.5">
                     <input
                       type="text"
                       placeholder="નોંધ"
                       value={discount.note}
                       onChange={(e) => updateDiscount(index, 'note', e.target.value)}
-                      className="col-span-2 px-1.5 py-0.5 border border-green-200 rounded"
+                      className="w-32 px-1.5 py-0.5 border border-green-200 rounded bg-white"
                     />
+                    <span className="text-gray-400">×</span>
                     <input
                       type="number"
                       placeholder="સંખ્યા"
                       min="1"
                       value={discount.item_count}
                       onChange={(e) => updateDiscount(index, 'item_count', parseInt(e.target.value) || 1)}
-                      className="px-1.5 py-0.5 border border-green-200 rounded"
+                      className="w-14 px-1.5 py-0.5 border border-green-200 rounded bg-white"
                     />
+                    <span className="text-gray-400">×</span>
                     <input
                       type="number"
                       placeholder="કિંમત"
-                      step="0.01"
+                      step="1"
                       min="0"
                       value={discount.price}
                       onChange={(e) => updateDiscount(index, 'price', parseFloat(e.target.value) || 0)}
-                      className="px-1.5 py-0.5 border border-green-200 rounded"
+                      className="w-16 px-1.5 py-0.5 border border-green-200 rounded bg-white"
                     />
+                    <span className="font-medium text-green-600">= ₹{discount.total}</span>
                   </div>
                   <button
                     onClick={() => removeDiscount(index)}
-                    className="p-1 text-red-500 rounded hover:bg-red-50"
+                    className="p-0.5 text-red-500 rounded hover:bg-red-50"
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -646,28 +652,30 @@ export function ComprehensiveBillManagement() {
             
             <div className="p-2 space-y-2">
               {payments.map((payment, index) => (
-                <div key={index} className="flex items-center gap-2 p-1.5 border border-purple-100 rounded bg-purple-50">
-                  <div className="flex-1 grid grid-cols-4 gap-1.5 items-center text-xs">
+                <div key={index} className="flex items-center gap-1.5 text-xs">
+                  <div className="flex-1 flex items-center gap-1.5">
                     <input
                       type="text"
                       placeholder="નોંધ"
                       value={payment.note}
                       onChange={(e) => updatePayment(index, 'note', e.target.value)}
-                      className="col-span-2 px-1.5 py-0.5 border border-purple-200 rounded"
+                      className="w-32 px-1.5 py-0.5 border border-purple-200 rounded bg-white"
                     />
+                    <span className="text-gray-400">:</span>
                     <input
                       type="number"
                       placeholder="રકમ"
-                      step="0.01"
+                      step="1"
                       min="0"
                       value={payment.payment_amount}
                       onChange={(e) => updatePayment(index, 'payment_amount', parseFloat(e.target.value) || 0)}
-                      className="col-span-2 px-1.5 py-0.5 border border-purple-200 rounded"
+                      className="w-24 px-1.5 py-0.5 border border-purple-200 rounded bg-white"
                     />
+                    <span className="font-medium text-purple-600">₹</span>
                   </div>
                   <button
                     onClick={() => removePayment(index)}
-                    className="p-1 text-red-500 rounded hover:bg-red-50"
+                    className="p-0.5 text-red-500 rounded hover:bg-red-50"
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -769,39 +777,6 @@ export function ComprehensiveBillManagement() {
                   </tbody>
                 </table>
               </div>
-
-
-
-              {/* NEW: Dynamic Service Charge with Per-Plate Rate */}
-              {/* <div className="p-3 border border-indigo-200 rounded bg-indigo-50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-bold text-indigo-800">
-                    સેવા ચાર્જ (₹{billData.service_rate_per_plate}/પ્લેટ):
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold text-indigo-600">₹{billData.service_charge.toFixed(2)}</span>
-                    <button
-                      onClick={() => {
-                        const newValue = prompt('સેવા ચાર્જ ઓવરરાઇડ કરો:', billData.service_charge.toString());
-                        if (newValue !== null) {
-                          setOverrideServiceCharge(parseFloat(newValue) || billData.service_charge);
-                        }
-                      }}
-                      className="p-1 text-indigo-600 rounded hover:bg-indigo-100"
-                    >
-                      <Edit3 className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-                <div className="text-xs text-indigo-600">
-                  ગણતરી: {billData.total_plates} પ્લેટ × ₹{billData.service_rate_per_plate} = ₹{(billData.total_plates * billData.service_rate_per_plate).toFixed(2)}
-                </div>
-                {overrideServiceCharge !== undefined && (
-                  <div className="text-xs text-indigo-600">
-                    મૂળ ગણતરી: ₹{(billData.total_plates * billData.service_rate_per_plate).toFixed(2)}
-                  </div>
-                )}
-              </div> */}
 
               {/* Extra Charges Display */}
               {billData.extra_charges.length > 0 && (

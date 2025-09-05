@@ -95,7 +95,22 @@ export function ComprehensiveBillManagement() {
     if (billData && selectedClient) {
       handleCalculateBill();
     }
-  }, [serviceRatePerPlate, overrideTotalPlates]);
+  }, [serviceRatePerPlate]);
+
+  // Separate effect for total plates override to prevent infinite loop
+  useEffect(() => {
+    if (billData && overrideTotalPlates !== undefined) {
+      // Recalculate service charge with new total plates
+      const newServiceCharge = overrideTotalPlates * serviceRatePerPlate;
+      setBillData(prev => prev ? {
+        ...prev,
+        service_charge: newServiceCharge,
+        grand_total: prev.total_udhar + newServiceCharge + prev.extra_charges_total,
+        final_due: Math.max(0, prev.total_udhar + newServiceCharge + prev.extra_charges_total - prev.discounts_total - prev.advance_paid - prev.payments_total),
+        balance_carry_forward: Math.max(0, -(prev.total_udhar + newServiceCharge + prev.extra_charges_total - prev.discounts_total - prev.advance_paid - prev.payments_total))
+      } : null);
+    }
+  }, [overrideTotalPlates, serviceRatePerPlate, billData?.total_udhar, billData?.extra_charges_total, billData?.discounts_total, billData?.advance_paid, billData?.payments_total]);
 
   const fetchClients = async () => {
     try {
@@ -168,6 +183,117 @@ export function ComprehensiveBillManagement() {
 
     setGenerating(true);
     try {
+      // Save bill data to Supabase first
+      const { data: savedBill, error: billError } = await supabase
+        .from('bills')
+        .insert([{
+          bill_number: billData.bill_number,
+          client_id: billData.client.id,
+          billing_period_start: billData.date_ranges[0]?.start_date || billData.bill_date,
+          billing_period_end: billData.bill_date,
+          total_udhar_quantity: overrideTotalPlates !== undefined ? overrideTotalPlates : billData.total_plates_udhar,
+          service_charge: billData.service_charge,
+          period_charges: billData.total_udhar,
+          total_amount: billData.grand_total,
+          previous_payments: billData.advance_paid,
+          net_due: billData.final_due,
+          payment_status: billData.final_due > 0 ? 'pending' : 'paid',
+          daily_rate: billData.rates.daily_rent_rate,
+          service_rate: serviceRatePerPlate,
+          extra_charges_total: billData.extra_charges_total,
+          discounts_total: billData.discounts_total,
+          payments_total: billData.payments_total,
+          advance_paid: billData.advance_paid,
+          final_due: billData.final_due,
+          balance_carry_forward: billData.balance_carry_forward,
+          account_closure: accountClosure
+        }])
+        .select()
+        .single();
+
+      if (billError) {
+        console.error('Error saving bill to database:', billError);
+        alert('બિલ ડેટાબેઝમાં સેવ કરવામાં ભૂલ. કૃપા કરીને ફરી પ્રયત્ન કરો.');
+        return;
+      }
+
+      // Save bill line items
+      const lineItems = [];
+      
+      // Add rent line items
+      billData.date_ranges.forEach(range => {
+        lineItems.push({
+          bill_id: savedBill.id,
+          item_type: 'rent',
+          description: `Rent for ${range.plate_balance} plates for ${range.days} days`,
+          quantity: range.plate_balance * range.days,
+          rate: billData.rates.daily_rent_rate,
+          amount: range.rent_amount,
+          item_date: range.start_date
+        });
+      });
+
+      // Add service charge
+      lineItems.push({
+        bill_id: savedBill.id,
+        item_type: 'service_charge',
+        description: `Service charge for ${overrideTotalPlates !== undefined ? overrideTotalPlates : billData.total_plates_udhar} plates`,
+        quantity: overrideTotalPlates !== undefined ? overrideTotalPlates : billData.total_plates_udhar,
+        rate: serviceRatePerPlate,
+        amount: billData.service_charge
+      });
+
+      // Add extra charges
+      billData.extra_charges.forEach(charge => {
+        lineItems.push({
+          bill_id: savedBill.id,
+          item_type: 'extra_charge',
+          description: charge.note,
+          quantity: charge.item_count,
+          rate: charge.price,
+          amount: charge.total,
+          item_date: charge.date
+        });
+      });
+
+      // Add discounts
+      billData.discounts.forEach(discount => {
+        lineItems.push({
+          bill_id: savedBill.id,
+          item_type: 'discount',
+          description: discount.note,
+          quantity: discount.item_count,
+          rate: -discount.price,
+          amount: -discount.total,
+          item_date: discount.date
+        });
+      });
+
+      // Add payments
+      billData.payments.forEach(payment => {
+        lineItems.push({
+          bill_id: savedBill.id,
+          item_type: 'payment',
+          description: payment.note,
+          quantity: 1,
+          rate: payment.payment_amount,
+          amount: payment.payment_amount,
+          item_date: payment.date
+        });
+      });
+
+      // Save line items
+      if (lineItems.length > 0) {
+        const { error: lineItemsError } = await supabase
+          .from('bill_line_items')
+          .insert(lineItems);
+
+        if (lineItemsError) {
+          console.error('Error saving bill line items:', lineItemsError);
+          // Continue with JPG generation even if line items fail
+        }
+      }
+
       const jpgDataUrl = await generateComprehensiveBillJPG(billData);
       downloadComprehensiveBillJPG(jpgDataUrl, `comprehensive-bill-${billData.client.id}-${billData.bill_date}`);
       
@@ -179,10 +305,11 @@ export function ComprehensiveBillManagement() {
       setDiscounts([]);
       setPayments([]);
       setOverrideServiceCharge(undefined);
+      setOverrideTotalPlates(undefined);
       setAccountClosure('continue');
       await generateBillNumber();
       
-      alert('બિલ સફળતાપૂર્વક જનરેટ અને ડાઉનલોડ થયું!');
+      alert(`બિલ સફળતાપૂર્વક જનરેટ અને ડાઉનલોડ થયું!\nBill Number: ${billData.bill_number}\nDatabase ID: ${savedBill.id}`);
     } catch (error) {
       console.error('Error generating bill:', error);
       alert('બિલ જનરેટ કરવામાં ભૂલ. કૃપા કરીને ફરી પ્રયત્ન કરો.');
@@ -481,12 +608,13 @@ export function ComprehensiveBillManagement() {
           <div className="overflow-hidden bg-white border-2 border-purple-100 shadow-lg rounded-xl">
             <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-500">
               <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-                ₹ બિલિંગ દરો
+                <Settings className="w-4 h-4" />
+                બિલિંગ દરો અને એડિટ વિકલ્પો
               </h3>
             </div>
             
             <div className="p-3 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <div>
                   <label className="block mb-1 text-xs font-medium text-gray-700">
                     દૈનિક ભાડો (પ્લેટ/દિવસ)
@@ -502,7 +630,7 @@ export function ComprehensiveBillManagement() {
                 </div>
                 <div>
                   <label className="block mb-1 text-xs font-medium text-gray-700">
-                    સર્વિસ ચાર્જ 
+                    સર્વિસ ચાર્જ (પ્રતિ પ્લેટ)
                   </label>
                   <input
                     type="number"
@@ -513,6 +641,51 @@ export function ComprehensiveBillManagement() {
                     className="w-full px-3 py-2 text-sm border-2 border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-100 focus:border-purple-500"
                   />
                 </div>
+                
+                {/* Total Plates Override Section */}
+                {billData && (
+                  <div className="p-3 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                    <label className="block mb-2 text-sm font-medium text-blue-700">
+                      કુલ ઉધાર પ્લેટ્સ એડિટ કરો:
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={overrideTotalPlates !== undefined ? overrideTotalPlates : billData.total_plates_udhar}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value) || 0;
+                          setOverrideTotalPlates(value);
+                        }}
+                        className="flex-1 px-3 py-2 text-sm border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 font-bold text-center"
+                        placeholder="કુલ પ્લેટ્સ"
+                      />
+                      <button
+                        onClick={() => setOverrideTotalPlates(undefined)}
+                        className="px-3 py-2 text-xs font-medium text-white bg-blue-600 border border-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        રીસેટ
+                      </button>
+                    </div>
+                    <div className="mt-2 text-xs text-blue-600 bg-blue-100 p-2 rounded">
+                      <div className="flex justify-between">
+                        <span>મૂળ કુલ ઉધાર પ્લેટ્સ:</span>
+                        <span className="font-bold">{billData.total_plates_udhar}</span>
+                      </div>
+                      {overrideTotalPlates !== undefined && (
+                        <div className="flex justify-between mt-1 text-orange-600">
+                          <span>એડિટેડ કુલ પ્લેટ્સ:</span>
+                          <span className="font-bold">{overrideTotalPlates}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between mt-1 text-purple-600">
+                        <span>સર્વિસ ચાર્જ:</span>
+                        <span className="font-bold">₹{((overrideTotalPlates !== undefined ? overrideTotalPlates : billData.total_plates_udhar) * serviceRatePerPlate).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -845,39 +1018,6 @@ export function ComprehensiveBillManagement() {
                   <div className="flex justify-between">
                     <span>સેવા ચાર્જ ({overrideTotalPlates !== undefined ? overrideTotalPlates : billData.total_plates_udhar} પ્લેટ × ₹{billData.service_rate_per_plate}):</span>
                     <span className="font-bold">₹{billData.service_charge.toFixed(2)}</span>
-                    {overrideTotalPlates !== undefined && (
-                      <span className="ml-1 text-xs text-orange-600">(એડિટેડ)</span>
-                    )}
-                  </div>
-                  
-                  {/* Edit option for total udhar plates */}
-                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
-                    <div className="flex items-center justify-between gap-2">
-                      <label className="text-xs font-medium text-blue-700">
-                        કુલ ઉધાર પ્લેટ્સ એડિટ કરો:
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min="0"
-                          value={overrideTotalPlates !== undefined ? overrideTotalPlates : billData.total_plates_udhar}
-                          onChange={(e) => {
-                            const value = parseInt(e.target.value) || 0;
-                            setOverrideTotalPlates(value);
-                          }}
-                          className="w-16 px-2 py-1 text-xs border border-blue-300 rounded focus:ring-1 focus:ring-blue-200 focus:border-blue-500"
-                        />
-                        <button
-                          onClick={() => setOverrideTotalPlates(undefined)}
-                          className="px-2 py-1 text-xs font-medium text-blue-600 border border-blue-300 rounded hover:bg-blue-100"
-                        >
-                          રીસેટ
-                        </button>
-                      </div>
-                    </div>
-                    <div className="mt-1 text-xs text-blue-600">
-                      મૂળ: {billData.total_plates_udhar} પ્લેટ્સ
-                    </div>
                   </div>
                   {billData.extra_charges_total > 0 && (
                     <div className="flex justify-between text-orange-600">

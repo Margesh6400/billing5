@@ -385,8 +385,8 @@ export class ComprehensiveBillingCalculator {
     try {
       const { data, error } = await supabase
         .from('bills')
-        .select('id')
-        .order('id', { ascending: false })
+        .select('bill_number')
+        .order('bill_number', { ascending: false })
         .limit(1);
 
       if (error && error.code === '42P01') {
@@ -397,7 +397,12 @@ export class ComprehensiveBillingCalculator {
 
       let nextNumber = 1;
       if (data && data.length > 0) {
-        nextNumber = data.length + 1;
+        const lastBillNumber = data[0].bill_number;
+        // Extract numeric part from bill number (e.g., "BILL-0005" -> 5)
+        const match = lastBillNumber.match(/BILL-(\d+)/);
+        if (match) {
+          nextNumber = parseInt(match[1], 10) + 1;
+        }
       }
 
       return `BILL-${nextNumber.toString().padStart(4, '0')}`;

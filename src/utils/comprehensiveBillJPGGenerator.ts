@@ -265,7 +265,7 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
                 <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#059669;">${formatCurrency(data.total_udhar)}</td>
               </tr>
               <tr style="background:#f3f4f6;">
-                <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">સેવા ચાર્જ (${data.service_charge_percentage}%):</td>
+                <td style="padding:15px;border:1px solid #e2e8f0;font-weight:600;">સેવા ચાર્જ (${data.total_plates_udhar} પ્લેટ × ₹${data.service_rate_per_plate}):</td>
                 <td style="padding:15px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;color:#7c3aed;">${formatCurrency(data.service_charge)}</td>
               </tr>
               

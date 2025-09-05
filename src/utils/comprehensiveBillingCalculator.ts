@@ -339,8 +339,8 @@ export class ComprehensiveBillingCalculator {
     const calculatedTotalPlates = totalPlatesUdhar - totalPlatesJama;
     const totalPlates = overrideTotalPlates !== undefined ? overrideTotalPlates : calculatedTotalPlates;
     
-    // Calculate service charge dynamically with per-plate rate
-    const calculatedServiceCharge = totalPlates * serviceRatePerPlate;
+    // Calculate service charge based on total udhar plates
+    const calculatedServiceCharge = totalPlatesUdhar * serviceRatePerPlate;
     const serviceCharge = overrideServiceCharge !== undefined ? overrideServiceCharge : calculatedServiceCharge;
     
     // Calculate totals for other sections

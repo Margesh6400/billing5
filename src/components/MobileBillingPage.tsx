@@ -337,8 +337,7 @@ export function ComprehensiveBillManagement() {
           <div className="inline-flex items-center justify-center w-10 h-10 mb-2 rounded-full shadow-lg bg-gradient-to-r from-blue-600 to-indigo-600">
             <Calculator className="w-5 h-5 text-white" />
           </div>
-          <h1 className="mb-1 text-base font-bold text-gray-900">કમ્પ્રીહેન્સિવ બિલિંગ</h1>
-          <p className="text-xs text-blue-600">ડાયનેમિક પ્લેટ અને સર્વિસ ચાર્જ</p>
+          <h1 className="mb-1 text-base font-bold text-gray-900">બિલિંગ</h1>
         </div>
 
         {/* Client Selection */}
@@ -432,7 +431,7 @@ export function ComprehensiveBillManagement() {
                     value={billNumber}
                     onChange={(e) => setBillNumber(e.target.value)}
                     className="w-full px-3 py-2 text-sm border-2 border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                    placeholder="BILL-0001"
+                    placeholder="B-0001"
                   />
                 </div>
                 <div>
@@ -580,7 +579,7 @@ export function ComprehensiveBillManagement() {
                     </span>
                     <button
                       onClick={() => removeExtraCharge(index)}
-                      className="px-2 py-1 text-xs text-red-600 hover:bg-red-100 rounded"
+                      className="px-2 py-1 text-xs text-red-600 rounded hover:bg-red-100"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -651,7 +650,7 @@ export function ComprehensiveBillManagement() {
                     </span>
                     <button
                       onClick={() => removeDiscount(index)}
-                      className="px-2 py-1 text-xs text-red-600 hover:bg-red-100 rounded"
+                      className="px-2 py-1 text-xs text-red-600 rounded hover:bg-red-100"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -714,7 +713,7 @@ export function ComprehensiveBillManagement() {
                     </span>
                     <button
                       onClick={() => removePayment(index)}
-                      className="px-2 py-1 text-xs text-red-600 hover:bg-red-100 rounded"
+                      className="px-2 py-1 text-xs text-red-600 rounded hover:bg-red-100"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -747,20 +746,15 @@ export function ComprehensiveBillManagement() {
               <div className="mb-4">
                 <h4 className="flex items-center gap-2 mb-2 text-sm font-bold text-purple-800">
                   <Package className="w-4 h-4" />
-                  Transaction Ledger / વ્યવહાર ખાતાવહી
+                  વ્યવહાર ખાતાવહી
                 </h4>
-                <div className="p-2 mb-2 text-xs border rounded text-amber-700 bg-amber-50 border-amber-200">
-                  <strong>Rule:</strong> જમા આગલા દિવસથી અસરકારક (Jama effective from next day)
-                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs border border-gray-200 rounded">
                     <thead>
                       <tr className="text-white bg-gradient-to-r from-purple-500 to-violet-500">
                         <th className="px-2 py-1 text-left">Date</th>
-                        <th className="px-2 py-1 text-center">પ્લેટ્સ</th>
                         <th className="px-2 py-1 text-center">Udhar</th>
                         <th className="px-2 py-1 text-center">Jama</th>
-                        <th className="px-2 py-1 text-center">Balance</th>
                         <th className="px-2 py-1 text-left">Challan</th>
                       </tr>
                     </thead>
@@ -772,17 +766,11 @@ export function ComprehensiveBillManagement() {
                           <td className="px-2 py-1 font-medium">
                             {new Date(entry.date).toLocaleDateString('en-GB')}
                           </td>
-                          <td className="px-2 py-1 font-bold text-center text-gray-600">
-                            {entry.plates_before}
-                          </td>
                           <td className="px-2 py-1 font-bold text-center text-red-600">
                             {entry.udhar > 0 ? entry.udhar : '-'}
                           </td>
                           <td className="px-2 py-1 font-bold text-center text-green-600">
                             {entry.jama > 0 ? entry.jama : '-'}
-                          </td>
-                          <td className="px-2 py-1 font-bold text-center text-blue-600">
-                            {entry.balance_after}
                           </td>
                           <td className="px-2 py-1 text-xs text-gray-500">
                             #{entry.challan_number}
@@ -838,7 +826,7 @@ export function ComprehensiveBillManagement() {
               </div>
 
               {/* NEW: Dynamic Total Plates with Override Option */}
-              <div className="p-3 border border-cyan-200 rounded bg-cyan-50">
+              <div className="p-3 border rounded border-cyan-200 bg-cyan-50">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-bold text-cyan-800">કુલ પ્લેટ (Total Plates):</span>
                   <div className="flex items-center gap-2">
@@ -851,7 +839,7 @@ export function ComprehensiveBillManagement() {
                           setOverrideTotalPlates(parsedValue);
                         }
                       }}
-                      className="p-1 text-cyan-600 hover:bg-cyan-100 rounded"
+                      className="p-1 rounded text-cyan-600 hover:bg-cyan-100"
                     >
                       <Edit3 className="w-3 h-3" />
                     </button>
@@ -868,7 +856,7 @@ export function ComprehensiveBillManagement() {
               </div>
 
               {/* NEW: Dynamic Service Charge with Per-Plate Rate */}
-              <div className="p-3 border border-indigo-200 rounded bg-indigo-50">
+              {/* <div className="p-3 border border-indigo-200 rounded bg-indigo-50">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-bold text-indigo-800">
                     સેવા ચાર્જ (₹{billData.service_rate_per_plate}/પ્લેટ):
@@ -882,7 +870,7 @@ export function ComprehensiveBillManagement() {
                           setOverrideServiceCharge(parseFloat(newValue) || billData.service_charge);
                         }
                       }}
-                      className="p-1 text-indigo-600 hover:bg-indigo-100 rounded"
+                      className="p-1 text-indigo-600 rounded hover:bg-indigo-100"
                     >
                       <Edit3 className="w-3 h-3" />
                     </button>
@@ -896,7 +884,7 @@ export function ComprehensiveBillManagement() {
                     મૂળ ગણતરી: ₹{(billData.total_plates * billData.service_rate_per_plate).toFixed(2)}
                   </div>
                 )}
-              </div>
+              </div> */}
 
               {/* Extra Charges Display */}
               {billData.extra_charges.length > 0 && (
@@ -957,7 +945,7 @@ export function ComprehensiveBillManagement() {
                     <span className="font-bold">₹{billData.total_udhar.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>સેવા ચાર્જ ({billData.total_plates} પ્લેટ × ₹{billData.service_rate_per_plate}):</span>
+                    <span>સેવા ચાર્જ ({billData.total_plates_udhar} પ્લેટ × ₹{billData.service_rate_per_plate}):</span>
                     <span className="font-bold">₹{billData.service_charge.toFixed(2)}</span>
                   </div>
                   {billData.extra_charges_total > 0 && (

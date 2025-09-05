@@ -843,8 +843,11 @@ export function ComprehensiveBillManagement() {
                     <span className="font-bold">₹{billData.total_udhar.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>સેવા ચાર્જ ({billData.total_plates_udhar} પ્લેટ × ₹{billData.service_rate_per_plate}):</span>
+                    <span>સેવા ચાર્જ ({overrideTotalPlates !== undefined ? overrideTotalPlates : billData.total_plates_udhar} પ્લેટ × ₹{billData.service_rate_per_plate}):</span>
                     <span className="font-bold">₹{billData.service_charge.toFixed(2)}</span>
+                    {overrideTotalPlates !== undefined && (
+                      <span className="ml-1 text-xs text-orange-600">(એડિટેડ)</span>
+                    )}
                   </div>
                   {billData.extra_charges_total > 0 && (
                     <div className="flex justify-between text-orange-600">

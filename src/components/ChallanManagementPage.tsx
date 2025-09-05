@@ -1432,3 +1432,4 @@ export function ChallanManagementPage() {
     </div>
   );
 }
+// Export the component

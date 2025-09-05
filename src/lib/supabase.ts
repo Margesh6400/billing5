@@ -201,29 +201,112 @@ export type Database = {
       bills: {
         Row: {
           id: number
+          bill_number: string
           client_id: string
-          period_start: string
-          period_end: string
+          billing_period_start: string
+          billing_period_end: string
+          total_udhar_quantity: number
+          service_charge: number
+          period_charges: number
           total_amount: number
+          previous_payments: number
+          net_due: number
           payment_status: string
+          daily_rate: number
+          service_rate: number
+          generated_at: string
+          created_at: string
+          updated_at: string
+          extra_charges_total: number
+          discounts_total: number
+          payments_total: number
+          advance_paid: number
+          final_due: number
+          balance_carry_forward: number
+          account_closure: string
+        }
+        Insert: {
+          id?: number
+          bill_number: string
+          client_id: string
+          billing_period_start: string
+          billing_period_end: string
+          total_udhar_quantity?: number
+          service_charge?: number
+          period_charges?: number
+          total_amount?: number
+          previous_payments?: number
+          net_due?: number
+          payment_status?: string
+          daily_rate?: number
+          service_rate?: number
+          generated_at?: string
+          created_at?: string
+          updated_at?: string
+          extra_charges_total?: number
+          discounts_total?: number
+          payments_total?: number
+          advance_paid?: number
+          final_due?: number
+          balance_carry_forward?: number
+          account_closure?: string
+        }
+        Update: {
+          id?: number
+          bill_number?: string
+          client_id?: string
+          billing_period_start?: string
+          billing_period_end?: string
+          total_udhar_quantity?: number
+          service_charge?: number
+          period_charges?: number
+          total_amount?: number
+          previous_payments?: number
+          net_due?: number
+          payment_status?: string
+          daily_rate?: number
+          service_rate?: number
+          generated_at?: string
+          created_at?: string
+          updated_at?: string
+          extra_charges_total?: number
+          discounts_total?: number
+          payments_total?: number
+          advance_paid?: number
+          final_due?: number
+          balance_carry_forward?: number
+          account_closure?: string
+        }
+      }
+      bill_line_items: {
+        Row: {
+          id: number
+          bill_id: number
+          item_type: string
+          description: string
+          quantity: number
+          rate: number
+          amount: number
           created_at: string
         }
         Insert: {
           id?: number
-          client_id: string
-          period_start: string
-          period_end: string
-          total_amount?: number
-          payment_status?: string
+          bill_id: number
+          item_type: string
+          description: string
+          quantity?: number
+          rate?: number
+          amount?: number
           created_at?: string
         }
         Update: {
           id?: number
-          client_id?: string
-          period_start?: string
-          period_end?: string
-          total_amount?: number
-          payment_status?: string
+          bill_id?: number
+          item_type?: string
+          description?: string
+          quantity?: number
+          rate?: number
+          amount?: number
           created_at?: string
         }
       }

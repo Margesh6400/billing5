@@ -69,6 +69,7 @@ export function ComprehensiveBillManagement() {
   
   // Override fields
   const [overrideServiceCharge, setOverrideServiceCharge] = useState<number | undefined>(undefined);
+  const [overrideTotalPlates, setOverrideTotalPlates] = useState<number | undefined>(undefined);
   
   // NEW: Account closure option
   const [accountClosure, setAccountClosure] = useState<'close' | 'continue'>('continue');
@@ -94,7 +95,7 @@ export function ComprehensiveBillManagement() {
     if (billData && selectedClient) {
       handleCalculateBill();
     }
-  }, [serviceRatePerPlate]);
+  }, [serviceRatePerPlate, overrideTotalPlates]);
 
   const fetchClients = async () => {
     try {
@@ -146,7 +147,7 @@ export function ComprehensiveBillManagement() {
         extraCharges,
         discounts,
         payments,
-        undefined, // No total plates override
+        overrideTotalPlates, // Total plates override
         overrideServiceCharge,
         serviceRatePerPlate,
         accountClosure

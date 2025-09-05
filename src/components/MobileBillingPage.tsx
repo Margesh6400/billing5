@@ -644,7 +644,7 @@ export function ComprehensiveBillManagement() {
                 
                 {/* Total Plates Override Section */}
                 {billData && (
-                  <div className="p-3 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                  <div className="p-3 border-2 border-blue-200 rounded-lg bg-blue-50">
                     <label className="block mb-2 text-sm font-medium text-blue-700">
                       કુલ ઉધાર પ્લેટ્સ એડિટ કરો:
                     </label>
@@ -658,17 +658,17 @@ export function ComprehensiveBillManagement() {
                           const value = parseInt(e.target.value) || 0;
                           setOverrideTotalPlates(value);
                         }}
-                        className="flex-1 px-3 py-2 text-sm border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 font-bold text-center"
+                        className="flex-1 px-3 py-2 text-sm font-bold text-center border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500"
                         placeholder="કુલ પ્લેટ્સ"
                       />
                       <button
                         onClick={() => setOverrideTotalPlates(undefined)}
-                        className="px-3 py-2 text-xs font-medium text-white bg-blue-600 border border-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                        className="px-3 py-2 text-xs font-medium text-white transition-colors bg-blue-600 border border-blue-600 rounded-lg hover:bg-blue-700"
                       >
                         રીસેટ
                       </button>
                     </div>
-                    <div className="mt-2 text-xs text-blue-600 bg-blue-100 p-2 rounded">
+                    <div className="p-2 mt-2 text-xs text-blue-600 bg-blue-100 rounded">
                       <div className="flex justify-between">
                         <span>મૂળ કુલ ઉધાર પ્લેટ્સ:</span>
                         <span className="font-bold">{billData.total_plates_udhar}</span>

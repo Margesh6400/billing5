@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Database } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { 
+  ArrowRightCircle,
   Calculator, 
   Download, 
   Search, 
@@ -67,7 +68,6 @@ export function ComprehensiveBillManagement() {
   const [serviceRatePerPlate, setServiceRatePerPlate] = useState(10.0); // ₹10 per plate default
   
   // Override fields
-  const [overrideTotalPlates, setOverrideTotalPlates] = useState<number | undefined>(undefined);
   const [overrideServiceCharge, setOverrideServiceCharge] = useState<number | undefined>(undefined);
   
   // NEW: Account closure option
@@ -89,19 +89,12 @@ export function ComprehensiveBillManagement() {
     generateBillNumber();
   }, []);
 
-  // Recalculate when service rate per plate changes
+    // Recalculate when service rate per plate changes
   useEffect(() => {
     if (billData && selectedClient) {
       handleCalculateBill();
     }
   }, [serviceRatePerPlate]);
-
-  // Recalculate when total plates override changes
-  useEffect(() => {
-    if (billData && selectedClient && overrideTotalPlates !== undefined) {
-      handleCalculateBill();
-    }
-  }, [overrideTotalPlates]);
 
   const fetchClients = async () => {
     try {
@@ -153,7 +146,7 @@ export function ComprehensiveBillManagement() {
         extraCharges,
         discounts,
         payments,
-        overrideTotalPlates,
+        undefined, // No total plates override
         overrideServiceCharge,
         serviceRatePerPlate,
         accountClosure
@@ -184,7 +177,6 @@ export function ComprehensiveBillManagement() {
       setExtraCharges([]);
       setDiscounts([]);
       setPayments([]);
-      setOverrideTotalPlates(undefined);
       setOverrideServiceCharge(undefined);
       setAccountClosure('continue');
       await generateBillNumber();
@@ -817,43 +809,7 @@ export function ComprehensiveBillManagement() {
                 </table>
               </div>
 
-              {/* Total Udhar */}
-              <div className="p-3 border border-blue-200 rounded bg-blue-50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-bold text-blue-800">કુલ ઉધાર (Total Udhar):</span>
-                  <span className="text-lg font-bold text-blue-600">₹{billData.total_udhar.toFixed(2)}</span>
-                </div>
-              </div>
 
-              {/* NEW: Dynamic Total Plates with Override Option */}
-              <div className="p-3 border rounded border-cyan-200 bg-cyan-50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-bold text-cyan-800">કુલ પ્લેટ (Total Plates):</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold text-cyan-600">{billData.total_plates}</span>
-                    <button
-                      onClick={() => {
-                        const newValue = prompt('કુલ પ્લેટ ઓવરરાઇડ કરો:', billData.total_plates.toString());
-                        if (newValue !== null) {
-                          const parsedValue = parseInt(newValue) || billData.total_plates;
-                          setOverrideTotalPlates(parsedValue);
-                        }
-                      }}
-                      className="p-1 rounded text-cyan-600 hover:bg-cyan-100"
-                    >
-                      <Edit3 className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-                <div className="text-xs text-cyan-600">
-                  ગણતરી: {billData.total_plates_udhar} ઉધાર - {billData.total_plates_jama} જમા = {billData.total_plates_udhar - billData.total_plates_jama}
-                </div>
-                {overrideTotalPlates !== undefined && (
-                  <div className="text-xs text-cyan-600">
-                    મૂળ ગણતરી: {billData.total_plates_udhar - billData.total_plates_jama} પ્લેટ
-                  </div>
-                )}
-              </div>
 
               {/* NEW: Dynamic Service Charge with Per-Plate Rate */}
               {/* <div className="p-3 border border-indigo-200 rounded bg-indigo-50">
@@ -989,44 +945,51 @@ export function ComprehensiveBillManagement() {
                 </div>
               </div>
 
-              {/* NEW: Account Closure Option */}
-              <div className="p-3 border-2 border-yellow-300 rounded-lg bg-yellow-50">
-                <h4 className="flex items-center gap-2 mb-3 text-sm font-bold text-yellow-800">
-                  <Target className="w-4 h-4" />
-                  એકાઉન્ટ બંધ કરવાનો વિકલ્પ
-                </h4>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-3 p-2 border border-yellow-200 rounded-lg cursor-pointer hover:bg-yellow-100">
-                    <input
-                      type="radio"
-                      name="accountClosure"
-                      value="close"
-                      checked={accountClosure === 'close'}
-                      onChange={(e) => setAccountClosure(e.target.value as 'close' | 'continue')}
-                      className="w-4 h-4 text-red-600"
-                    />
-                    <div className="flex items-center gap-2">
-                      <ToggleRight className="w-4 h-4 text-red-600" />
-                      <span className="text-sm font-medium text-red-700">Account Close</span>
-                    </div>
-                    <span className="text-xs text-red-600">(Finalize ledger, reset balance to 0)</span>
-                  </label>
-                  
-                  <label className="flex items-center gap-3 p-2 border border-yellow-200 rounded-lg cursor-pointer hover:bg-yellow-100">
-                    <input
-                      type="radio"
-                      name="accountClosure"
-                      value="continue"
-                      checked={accountClosure === 'continue'}
-                      onChange={(e) => setAccountClosure(e.target.value as 'close' | 'continue')}
-                      className="w-4 h-4 text-green-600"
-                    />
-                    <div className="flex items-center gap-2">
-                      <ToggleLeft className="w-4 h-4 text-green-600" />
-                      <span className="text-sm font-medium text-green-700">Continue</span>
-                    </div>
-                    <span className="text-xs text-green-600">(Carry forward balance to next cycle)</span>
-                  </label>
+              {/* Account Closure Option */}
+              <div className="overflow-hidden bg-white border-2 border-indigo-100 shadow-lg rounded-xl">
+                <div className="p-3 bg-gradient-to-r from-indigo-500 to-blue-500">
+                  <h3 className="flex items-center gap-2 text-sm font-bold text-white">
+                    <Target className="w-4 h-4" />
+                    એકાઉન્ટ વિકલ્પો
+                  </h3>
+                </div>
+                
+                <div className="p-3 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setAccountClosure('close')}
+                      className={`flex flex-col items-center p-3 transition-all duration-200 border-2 rounded-lg ${
+                        accountClosure === 'close'
+                          ? 'border-red-500 bg-red-50 shadow-md'
+                          : 'border-gray-200 hover:border-red-300 hover:bg-red-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center w-10 h-10 mb-2 rounded-full bg-gradient-to-r from-red-500 to-pink-500">
+                        <Lock className="w-5 h-5 text-white" />
+                      </div>
+                      <span className={`text-sm font-bold ${
+                        accountClosure === 'close' ? 'text-red-700' : 'text-gray-700'
+                      }`}>એકાઉન્ટ બંધ કરો</span>
+                      <span className="text-xs text-gray-500">બેલેન્સ રીસેટ કરો</span>
+                    </button>
+
+                    <button
+                      onClick={() => setAccountClosure('continue')}
+                      className={`flex flex-col items-center p-3 transition-all duration-200 border-2 rounded-lg ${
+                        accountClosure === 'continue'
+                          ? 'border-green-500 bg-green-50 shadow-md'
+                          : 'border-gray-200 hover:border-green-300 hover:bg-green-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center w-10 h-10 mb-2 rounded-full bg-gradient-to-r from-green-500 to-emerald-500">
+                        <ArrowRightCircle className="w-5 h-5 text-white" />
+                      </div>
+                      <span className={`text-sm font-bold ${
+                        accountClosure === 'continue' ? 'text-green-700' : 'text-gray-700'
+                      }`}>એકાઉન્ટ ચાલુ રાખો</span>
+                      <span className="text-xs text-gray-500">બેલેન્સ આગળ લઈ જાઓ</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 

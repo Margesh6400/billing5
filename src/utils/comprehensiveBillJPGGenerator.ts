@@ -6,231 +6,196 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
   tempDiv.style.position = 'absolute';
   tempDiv.style.left = '-9999px';
   tempDiv.style.top = '0';
-  tempDiv.style.width = '794px'; // A4 width in pixels at 96 DPI
+  tempDiv.style.width = '794px';
   tempDiv.style.backgroundColor = 'white';
   document.body.appendChild(tempDiv);
 
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return `₹${amount.toFixed(2)}`;
-  };
+  // Formatters
+  const formatCurrency = (amt: number) => `₹${amt.toFixed(2)}`;
+  const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('en-GB');
+  const formatDateRange = (start: string, end: string) =>
+    start === end
+      ? formatDate(start)
+      : `${formatDate(start)} થી ${formatDate(end)}`;
 
-  // Format date for Gujarati format
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-GB');
-  };
-
-  // Format date range
-  const formatDateRange = (startDate: string, endDate: string) => {
-    const start = formatDate(startDate);
-    const end = formatDate(endDate);
-    return startDate === endDate ? start : `${start} થી ${end}`;
-  };
-
-  // Calculate total transactions to show
-  const totalTransactions = Math.max(16, data.ledger_entries.length);
-  const emptyRows = totalTransactions - data.ledger_entries.length;
+  // Row calculations
+  const tableRows =
+    16
+    - data.date_ranges.length
+    - data.extra_charges.length
+    - data.discounts.length
+    - data.payments.length
+    - (data.advance_paid > 0 ? 1 : 0);
 
   tempDiv.innerHTML = `
-    <div style="width:794px;padding:20px;font-family:'Noto Sans Gujarati','Shruti','Gujarati MT',Arial,sans-serif;color:#000;background:#ffffff;border:3px solid #000;font-size:13px;">
-      <!-- Header Section -->
-      <div style="border:2px solid #000;margin-bottom:15px;">
-        <!-- Top Header with Contact Info -->
-        <div style="display:flex;border-bottom:1px solid #000;">
-          <div style="width:50%;padding:8px;border-right:1px solid #000;">
-            <div style="font-size:11px;text-align:center;">
-              <strong>પરમોત્તમભાઈ પોલરા</strong><br>
-              (રુપાલટીવાળા)
-            </div>
-          </div>
-          <div style="width:30%;padding:8px;border-right:1px solid #000;text-align:center;">
-            <div style="font-size:11px;">
-              <strong>શ્રી</strong><br>
-              <strong>શ્રી ગણેશાય નમ:</strong>
-            </div>
-          </div>
-          <div style="width:20%;padding:8px;text-align:right;">
-            <div style="font-size:10px;">
-              સુરેશભાઈ પોલરા - ૯૩૨૮૭ ૨૮૨૨૮<br>
-              હરેશભાઈ ફેમર - ૯૦૯૯૨ ૬૪૪૩૬<br>
-              હરેશભાઈ પોલરા - ૯૦૯૮૯ ૬૪૪૩૬<br>
-            </div>
-          </div>
+  <div style="width:794px;padding:20px 15px 15px 15px;font-family:'Noto Sans Gujarati','Shruti','Gujarati MT',Arial,sans-serif;color:#000;background:#fff;border:3px solid #000;font-size:15px;">
+    <!-- Header -->
+    <div style="padding-bottom:2px;border-bottom:2px solid #000;">
+      <div style="display:flex;justify-content:space-between;">
+        <div style="font-size:13px;line-height:1.45;font-weight:bold;">
+          પરમોત્તમભાઈ પોલરા<br>(રુપાલਟੀવાળા)
         </div>
-
-        <!-- Main Header -->
-        <div style="text-align:center;padding:10px;border-bottom:1px solid #000;">
-          <div style="display:flex;align-items:center;justify-content:center;gap:20px;">
-            <div style="width:60px;height:60px;background:#f0f0f0;border:1px solid #000;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:bold;color:#666;">PB</div>
-            <div style="flex:1;">
-              <h1 style="font-size:36px;font-weight:bold;margin:0;text-decoration:underline;">નિલકંઠ</h1>
-              <div style="font-size:24px;font-weight:bold;">પ્લેટ ડેપો</div>
-            </div>
-            <div style="border:2px solid #000;padding:8px;background:#f9f9f9;">
-              <div style="font-size:12px;font-weight:bold;">બિલ નંબર :</div>
-              <div style="font-size:16px;font-weight:bold;">${data.bill_number}</div>
-            </div>
-          </div>
+        <div style="font-size:13px;text-align:center;font-weight:bold;">
+          શ્રી ૧<br>શ્રી ગણેશાય નમ:
         </div>
-
-        <!-- Address -->
-        <div style="text-align:center;padding:5px;font-size:11px;">
-          ૧૦, અજમલધામ સોસાયટી,, સીમાડા ગામ, સુરત.
+        <div style="font-size:13px;text-align:right;line-height:1.45;min-width:160px;">
+          સુરેશભાઈ પોલરા - ૯૩૨૮૭ ૨૮૨૨૮<br>
+          હરેશભાઈ ફેમર - ૯૦૯૯૨ ૬૪૪૩૬<br>
+          હરેશભાઈ પોલરા - ૯૦૯૮૯ ૬૪૪૩૬
         </div>
-      </div>
-
-      <!-- Client Details -->
-      <div style="border:2px solid #000;margin-bottom:15px;">
-        <div style="display:flex;">
-          <div style="width:50%;padding:10px;border-right:1px solid #000;">
-            <div><strong>નામ:</strong> ${data.client.name}</div>
-            <div style="margin-top:5px;"><strong>સાઇટ:</strong> ${data.client.site || '-'}</div>
-          </div>
-          <div style="width:25%;padding:10px;border-right:1px solid #000;">
-            <div><strong>ID:</strong> ${data.client.id}</div>
-            <div style="margin-top:5px;"><strong>તારીખ :</strong> ${formatDate(data.bill_date)}</div>
-          </div>
-          <div style="width:25%;padding:10px;">
-            <div><strong>મોબાઇલ:</strong> ${data.client.mobile_number || '-'}</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Main Transaction Table -->
-      <div style="border:2px solid #000;margin-bottom:15px;">
-        <table style="width:100%;border-collapse:collapse;">
-          <!-- Table Header -->
-          <tr style="background:#000;color:#fff;">
-            <th style="border:1px solid #000;padding:8px;width:25%;font-size:11px;font-weight:bold;">આ. તારીખ થી જમા તારીખ</th>
-            <th style="border:1px solid #000;padding:8px;width:15%;font-size:11px;font-weight:bold;">જમા/ઉધાર</th>
-            <th style="border:1px solid #000;padding:8px;width:12%;font-size:11px;font-weight:bold;">સ્ટોક</th>
-            <th style="border:1px solid #000;padding:8px;width:12%;font-size:11px;font-weight:bold;">દિવસ</th>
-            <th style="border:1px solid #000;padding:8px;width:15%;font-size:11px;font-weight:bold;">રકમ</th>
-          </tr>
-
-          <!-- Date Range Billing Rows -->
-          ${data.date_ranges.map((range, index) => `
-            <tr style="background:#e6f3ff;">
-              <td style="border:1px solid #000;padding:6px;font-size:11px;">${formatDateRange(range.start_date, range.end_date)}</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:center;">ભાડો</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:center;">${range.plate_balance}</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:center;">${range.days}</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:right;">${formatCurrency(range.rent_amount)}</td>
-            </tr>
-          `).join('')}
-
-          <!-- Service Charge Row -->
-          <tr style="background:#fff2e6;">
-            <td style="border:1px solid #000;padding:6px;font-size:11px;">સર્વિસ ચાર્જ</td>
-            <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:center;">-</td>
-            <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:center;">${data.total_plates_udhar}</td>
-            <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:center;">@${data.service_rate_per_plate}</td>
-            <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:right;">${formatCurrency(data.service_charge)}</td>
-          </tr>
-
-          <!-- Extra Charges -->
-          ${data.extra_charges.map((charge, index) => `
-            <tr style="background:#ffebe6;">
-              <td style="border:1px solid #000;padding:6px;font-size:11px;">${formatDate(charge.date)} - ${charge.note}</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:center;">વધારો</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:center;">${charge.item_count}</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:center;">@${charge.price}</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:right;">${formatCurrency(charge.total)}</td>
-            </tr>
-          `).join('')}
-
-          <!-- Discounts -->
-          ${data.discounts.map((discount, index) => `
-            <tr style="background:#e6ffe6;">
-              <td style="border:1px solid #000;padding:6px;font-size:11px;">${formatDate(discount.date)} - ${discount.note}</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:center;">છૂટ</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:center;">${discount.item_count}</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:center;">@${discount.price}</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:right;">-${formatCurrency(discount.total)}</td>
-            </tr>
-          `).join('')}
-
-          <!-- Payments -->
-          ${data.payments.map((payment, index) => `
-            <tr style="background:#f0e6ff;">
-              <td style="border:1px solid #000;padding:6px;font-size:11px;">${formatDate(payment.date)} - ${payment.note}</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:center;">ચુકવણી</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:center;">-</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:center;">-</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:right;">-${formatCurrency(payment.payment_amount)}</td>
-            </tr>
-          `).join('')}
-
-          <!-- Previous Payment if exists -->
-          ${data.advance_paid > 0 ? `
-            <tr style="background:#e6f0ff;">
-              <td style="border:1px solid #000;padding:6px;font-size:11px;">અગાઉથી ચૂકવેલ</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:center;">ચુકવણી</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:center;">-</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:center;">-</td>
-              <td style="border:1px solid #000;padding:6px;font-size:11px;text-align:right;">-${formatCurrency(data.advance_paid)}</td>
-            </tr>
-          ` : ''}
-
-          <!-- Fill remaining empty rows to match template -->
-          ${Array.from({ length: Math.max(0, 16 - data.ledger_entries.length - data.date_ranges.length - data.extra_charges.length - data.discounts.length - data.payments.length - (data.advance_paid > 0 ? 1 : 0) - 1) }, (_, index) => `
-            <tr>
-              <td style="border:1px solid #000;padding:10px;font-size:11px;">&nbsp;</td>
-              <td style="border:1px solid #000;padding:10px;font-size:11px;">&nbsp;</td>
-              <td style="border:1px solid #000;padding:10px;font-size:11px;">&nbsp;</td>
-              <td style="border:1px solid #000;padding:10px;font-size:11px;">&nbsp;</td>
-              <td style="border:1px solid #000;padding:10px;font-size:11px;">&nbsp;</td>
-            </tr>
-          `).join('')}
-        </table>
-      </div>
-
-      <!-- Bottom Note and Total -->
-      <div style="border:2px solid #000;">
-        <!-- Note Section -->
-        <div style="padding:8px;border-bottom:1px solid #000;font-size:11px;">
-          <strong>નોંધ:</strong> આ બીલ મળવા પછી તરત જ બીલ ચુકવવાનું રહેશે.
-        </div>
-
-        <!-- Total Section -->
-        <div style="display:flex;">
-          <div style="width:50%;padding:10px;border-right:1px solid #000;">
-            <div style="font-size:11px;"><strong>લેનારની સહી</strong> ....................</div>
-          </div>
-          <div style="width:30%;padding:10px;border-right:1px solid #000;">
-            <div style="font-size:11px;"><strong>આપનારની સહી</strong> ....................</div>
-          </div>
-          <div style="width:20%;padding:10px;text-align:center;">
-            <div style="font-size:11px;font-weight:bold;">કોર,</div>
-            <div style="font-size:11px;font-weight:bold;">નિલકંઠ પ્લેટ ડેપો</div>
-          </div>
-        </div>
-
-        <!-- Final Amount Box -->
-        <div style="border-top:2px solid #000;background:#f0f0f0;padding:15px;text-align:center;">
-          <div style="font-size:14px;font-weight:bold;margin-bottom:5px;">
-            ${data.final_due > 0 ? 'બાકી રકમ / FINAL DUE' : data.balance_carry_forward > 0 ? 'બેલેન્સ કેરી ફોરવર્ડ' : 'સંપૂર્ણ ચૂકવણી / FULLY PAID'}
-          </div>
-          <div style="font-size:24px;font-weight:bold;color:${data.final_due > 0 ? '#dc2626' : '#059669'};">
-            ${data.final_due > 0 ? formatCurrency(data.final_due) : data.balance_carry_forward > 0 ? formatCurrency(data.balance_carry_forward) : '₹0.00'}
-          </div>
-          ${data.final_due > 0 || data.balance_carry_forward > 0 ? `
-            <div style="font-size:10px;margin-top:5px;color:#666;">
-              કુલ ઉધાર: ${formatCurrency(data.total_udhar)} + સર્વિસ: ${formatCurrency(data.service_charge)}
-              ${data.extra_charges_total > 0 ? ` + વધારો: ${formatCurrency(data.extra_charges_total)}` : ''}
-              ${data.discounts_total > 0 ? ` - છૂટ: ${formatCurrency(data.discounts_total)}` : ''}
-              ${data.payments_total > 0 ? ` - ચુકવણી: ${formatCurrency(data.payments_total)}` : ''}
-              ${data.advance_paid > 0 ? ` - અગાઉ: ${formatCurrency(data.advance_paid)}` : ''}
-            </div>
-          ` : ''}
-        </div>
-      </div>
-
-      <!-- Footer -->
-      <div style="text-align:center;margin-top:10px;font-size:9px;color:#666;">
-        Generated on ${new Date().toLocaleString('en-IN')} | NO WERE TECH Billing System
       </div>
     </div>
+    <div style="margin-top:5px;display:flex;justify-content:space-between;align-items:center;">
+      <div></div>
+      <div style="text-align:center;">
+        <span style="font-size:38px;font-weight:bold;background:transparent;">નિલકંઠ</span>
+        <div style="font-size:22px;font-weight:bold;margin-top:3px;">પ્લેટ ડેપો</div>
+      </div>
+      <div style="border:2px solid #000;border-radius:8px;padding:10px;min-width:90px;text-align:center;background:#fff;">
+        <div style="font-size:13px;">બિલ નંબર :</div>
+        <div style="font-size:21px;font-weight:bold;">${data.bill_number}</div>
+      </div>
+    </div>
+    <div style="text-align:left;font-size:15px;margin-top:2px;margin-bottom:5px;">
+      ૧૦, અજમલધામ સોસાયટી,, સીમાડા ગામ, સુરત.
+    </div>
+    <!-- Customer -->
+    <div style="margin-bottom:4px;display:flex;">
+      <div style="flex:2;border:2px solid #000;padding:7px;">
+        <div><strong>નામ:</strong> <span style="border-bottom:1.7px solid #000;margin-left:2px;">${data.client.name}</span></div>
+        <div><strong>સાઇટ:</strong> <span style="border-bottom:1.7px solid #000;margin-left:2px;">${data.client.site || '-'}</span></div>
+      </div>
+      <div style="flex:1;border:2px solid #000;border-left:none;padding:7px;">
+        <div><strong>ID:</strong> <span style="border-bottom:1.7px solid #000;margin-left:2px;">${data.client.id}</span></div>
+        <div><strong>તારીખ:</strong> <span style="border-bottom:1.7px solid #000;margin-left:2px;">${formatDate(data.bill_date)}</span></div>
+      </div>
+    </div>
+    <!-- Table -->
+    <table style="width:100%;border-collapse:collapse;margin-top:4px;font-size:16px;">
+      <tr style="background:#222;color:#fff;">
+        <th style="border:1.7px solid #000;padding:5px 2px;width:26%;font-size:15px;font-weight:bold;">આ. તારીખ થી જમા તારીખ</th>
+        <th style="border:1.7px solid #000;padding:5px;width:14%;font-size:15px;font-weight:bold;">જમા/ઉધાર</th>
+        <th style="border:1.7px solid #000;padding:5px;width:14%;font-size:15px;font-weight:bold;">સ્ટોક</th>
+        <th style="border:1.7px solid #000;padding:5px;width:14%;font-size:15px;font-weight:bold;">દિવસ</th>
+        <th style="border:1.7px solid #000;padding:5px;width:17%;font-size:15px;font-weight:bold;">રકમ</th>
+      </tr>
+      ${data.date_ranges.map(
+        (range) => `
+        <tr>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:left;font-size:15px;">${formatDateRange(range.start_date, range.end_date)}</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:center;font-size:15px;">ભાડો</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:center;font-size:15px;">${range.plate_balance}</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:center;font-size:15px;">${range.days}</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:right;font-size:15px;">${formatCurrency(range.rent_amount)}</td>
+        </tr>
+      `
+      ).join('')}
+      <!-- Service Charge -->
+      <tr>
+        <td style="border:1.2px solid #000;padding:9px 3px;text-align:left;">સર્વિસ ચાર્જ</td>
+        <td style="border:1.2px solid #000;padding:9px 3px;text-align:center;">-</td>
+        <td style="border:1.2px solid #000;padding:9px 3px;text-align:center;">${data.total_plates_udhar}</td>
+        <td style="border:1.2px solid #000;padding:9px 3px;text-align:center;">@${data.service_rate_per_plate}</td>
+        <td style="border:1.2px solid #000;padding:9px 3px;text-align:right;">${formatCurrency(data.service_charge)}</td>
+      </tr>
+      <!-- Extra Charges -->
+      ${data.extra_charges.map(
+        (charge) => `
+        <tr>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:left;">${formatDate(charge.date)} - ${charge.note}</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:center;">વધારો</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:center;">${charge.item_count}</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:center;">@${charge.price}</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:right;">${formatCurrency(charge.total)}</td>
+        </tr>
+      `
+      ).join('')}
+      <!-- Discounts -->
+      ${data.discounts.map(
+        (discount) => `
+        <tr>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:left;">${formatDate(discount.date)} - ${discount.note}</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:center;">છૂટ</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:center;">${discount.item_count}</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:center;">@${discount.price}</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:right;">-${formatCurrency(discount.total)}</td>
+        </tr>
+      `
+      ).join('')}
+      <!-- Payments -->
+      ${data.payments.map(
+        (payment) => `
+        <tr>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:left;">${formatDate(payment.date)} - ${payment.note}</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:center;">ચુકવણી</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:center;">-</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:center;">-</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:right;">-${formatCurrency(payment.payment_amount)}</td>
+        </tr>
+      `
+      ).join('')}
+      <!-- Previous Payment -->
+      ${data.advance_paid > 0
+        ? `
+        <tr>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:left;">અગાઉથી ચૂકવેલ</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:center;">ચુકવણી</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:center;">-</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:center;">-</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:right;">-${formatCurrency(data.advance_paid)}</td>
+        </tr>
+      `
+        : ''}
+      <!-- Empty Rows -->
+      ${Array.from({ length: Math.max(0, tableRows) }, () => `
+        <tr>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:left;">&nbsp;</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:left;">&nbsp;</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:left;">&nbsp;</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:left;">&nbsp;</td>
+          <td style="border:1.2px solid #000;padding:9px 3px;text-align:left;">&nbsp;</td>
+        </tr>
+      `).join('')}
+    </table>
+    <!-- Summary/Grand Total -->
+    <div style="padding:11px 7px 2px 7px;border:2px solid #000;border-top:none;border-bottom:none;font-size:15px;">
+      <div style="display:flex;justify-content:flex-end;">
+        <div style="font-weight:bold;">કુલ રકમ / Grand Total:</div>
+        <div style="margin-left:25px;font-weight:bold;">${formatCurrency(data.total_udhar + data.service_charge + data.extra_charges_total)}</div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;">
+        <div style="">ચુકવેલ / Paid:</div>
+        <div style="margin-left:16px;">${formatCurrency(data.payments_total + data.advance_paid)}</div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;">
+        <div style="font-weight:bold;color:#dc2626;">બાકી રકમ / Balance:</div>
+        <div style="margin-left:16px;font-weight:bold;color:#dc2626;">${formatCurrency(data.final_due)}</div>
+      </div>
+      ${data.balance_carry_forward > 0 ? `
+        <div style="display:flex;justify-content:flex-end;">
+          <div style="font-weight:bold;">કેરી ફોરવર્ડ / Carry Forward:</div>
+          <div style="margin-left:12px;font-weight:bold;">${formatCurrency(data.balance_carry_forward)}</div>
+        </div>
+      ` : ''}
+    </div>
+    <!-- Note -->
+    <div style="border:2px solid #000;border-top:none;padding:8px 6px 2px 6px;font-size:15px;">
+      <strong>નોટઃ</strong> આ બીલ મળ્યા પછી તરત જ બીલ ચુકવવાનું રહેશે.
+    </div>
+    <!-- Signature Section / Footer -->
+    <div style="display:flex;align-items:center;border:2px solid #000;border-top:none;padding:10px 8px;">
+      <div style="width:44%;border-right:2px solid #000;padding-right:10px;">
+        <strong>લેનારની સહી</strong> <span style="display:inline-block;border-bottom:1.5px solid #000;width:120px;margin-left:10px;">&nbsp;</span>
+      </div>
+      <div style="width:36%;border-right:2px solid #000;padding-right:10px;">
+        <strong>આપનારની સહી</strong> <span style="display:inline-block;border-bottom:1.5px solid #000;width:120px;margin-left:10px;">&nbsp;</span>
+      </div>
+      <div style="flex:1;padding-left:12px;text-align:center;">
+        <div style="font-size:15px;font-weight:bold;">કોર,</div>
+        <div style="font-size:16px;font-weight:bold;">નિલકંઠ પ્લેટ ડેપો</div>
+      </div>
+    </div>
+  </div>
   `;
 
   try {
@@ -240,11 +205,10 @@ export const generateComprehensiveBillJPG = async (data: ComprehensiveBillData):
       scale: 2,
       useCORS: true,
       allowTaint: false,
-      backgroundColor: '#ffffff',
+      backgroundColor: '#fff',
       removeContainer: true,
       logging: false
     });
-
     const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
     document.body.removeChild(tempDiv);
     return dataUrl;
@@ -260,12 +224,9 @@ export const downloadComprehensiveBillJPG = (dataUrl: string, filename: string) 
     link.download = `${filename}.jpg`;
     link.href = dataUrl;
     link.style.display = 'none';
-    
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
-    // Clean up the data URL to free memory
     URL.revokeObjectURL(dataUrl);
   } catch (error) {
     console.error('Error downloading JPG:', error);

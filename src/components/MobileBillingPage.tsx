@@ -849,6 +849,36 @@ export function ComprehensiveBillManagement() {
                       <span className="ml-1 text-xs text-orange-600">(એડિટેડ)</span>
                     )}
                   </div>
+                  
+                  {/* Edit option for total udhar plates */}
+                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-xs font-medium text-blue-700">
+                        કુલ ઉધાર પ્લેટ્સ એડિટ કરો:
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          value={overrideTotalPlates !== undefined ? overrideTotalPlates : billData.total_plates_udhar}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value) || 0;
+                            setOverrideTotalPlates(value);
+                          }}
+                          className="w-16 px-2 py-1 text-xs border border-blue-300 rounded focus:ring-1 focus:ring-blue-200 focus:border-blue-500"
+                        />
+                        <button
+                          onClick={() => setOverrideTotalPlates(undefined)}
+                          className="px-2 py-1 text-xs font-medium text-blue-600 border border-blue-300 rounded hover:bg-blue-100"
+                        >
+                          રીસેટ
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-1 text-xs text-blue-600">
+                      મૂળ: {billData.total_plates_udhar} પ્લેટ્સ
+                    </div>
+                  </div>
                   {billData.extra_charges_total > 0 && (
                     <div className="flex justify-between text-orange-600">
                       <span>વધારાના ચાર્જ:</span>

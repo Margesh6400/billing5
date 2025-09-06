@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { BillHistoryPage } from './BillHistoryPage';
+import { ClientBillingHistory } from './ClientBillingHistory';
 import { 
   ArrowRightCircle,
   Calculator, 
@@ -26,7 +28,10 @@ import {
   Target,
   Percent,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  FileText,
+  History,
+  ArrowLeft
 } from 'lucide-react';
 import { 
   ComprehensiveBillingCalculator, 
@@ -43,10 +48,14 @@ import {
 
 type Client = Database['public']['Tables']['clients']['Row'];
 
+type ViewMode = 'billing' | 'history' | 'client-history';
+
 export function ComprehensiveBillManagement() {
   const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('billing');
+  const [selectedClientForHistory, setSelectedClientForHistory] = useState<Client | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [calculating, setCalculating] = useState(false);
@@ -406,6 +415,48 @@ export function ComprehensiveBillManagement() {
     (client.site || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Handle view mode changes
+  const handleViewBillHistory = () => {
+    setViewMode('history');
+  };
+
+  const handleViewClientHistory = (client: Client) => {
+    setSelectedClientForHistory(client);
+    setViewMode('client-history');
+  };
+
+  const handleBackToBilling = () => {
+    setViewMode('billing');
+    setSelectedClientForHistory(null);
+  };
+
+  // Render different views based on mode
+  if (viewMode === 'history') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-cyan-50">
+        <div className="p-4">
+          <button
+            onClick={handleBackToBilling}
+            className="flex items-center gap-2 px-3 py-2 mb-4 text-sm font-medium text-blue-600 transition-colors border border-blue-200 rounded-lg hover:bg-blue-50"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            બિલિંગ પર પાછા જાઓ
+          </button>
+          <BillHistoryPage />
+        </div>
+      </div>
+    );
+  }
+
+  if (viewMode === 'client-history' && selectedClientForHistory) {
+    return (
+      <ClientBillingHistory
+        client={selectedClientForHistory}
+        onBack={handleBackToBilling}
+      />
+    );
+  }
+
   // Show access denied for non-admin users
   if (!user?.isAdmin) {
     return (
@@ -458,6 +509,15 @@ export function ComprehensiveBillManagement() {
             <Calculator className="w-5 h-5 text-white" />
           </div>
           <h1 className="mb-1 text-base font-bold text-gray-900">બિલિંગ</h1>
+          <div className="flex justify-center gap-2 mt-2">
+            <button
+              onClick={handleViewBillHistory}
+              className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-600 transition-colors border border-blue-200 rounded-full hover:bg-blue-50"
+            >
+              <History className="w-3 h-3" />
+              બિલ ઇતિહાસ
+            </button>
+          </div>
         </div>
 
         {/* Client Selection */}
@@ -498,6 +558,16 @@ export function ComprehensiveBillManagement() {
                           <div className="font-medium text-gray-900">{client.name}</div>
                           <div className="text-xs text-blue-600">ID: {client.id} | {client.site}</div>
                         </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewClientHistory(client);
+                          }}
+                          className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-purple-600 transition-colors border border-purple-200 rounded hover:bg-purple-50"
+                        >
+                          <History className="w-3 h-3" />
+                          ઇતિહાસ
+                        </button>
                       </div>
                     </button>
                   ))}
@@ -516,6 +586,13 @@ export function ComprehensiveBillManagement() {
                         ID: {selectedClient.id} | {selectedClient.site}
                       </div>
                     </div>
+                    <button
+                      onClick={() => handleViewClientHistory(selectedClient)}
+                      className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-purple-600 transition-colors border border-purple-200 rounded hover:bg-purple-50"
+                    >
+                      <History className="w-3 h-3" />
+                      ઇતિહાસ
+                    </button>
                   </div>
                 </div>
                 

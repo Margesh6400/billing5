@@ -14,6 +14,7 @@ const NAVIGATION_ITEMS = [
   { key: 'stock', label: 'સ્ટોક', icon: Package, path: '/stock' },
   { key: 'challans', label: 'ચલણ બૂક', icon: Receipt, path: '/challans' },
   { key: 'bills', label: 'બિલ', icon: DollarSign, path: '/bills' },
+  { key: 'bill-history', label: 'બિલ ઇતિહાસ', icon: Receipt, path: '/bill-history' },
   { key: 'ledger', label: 'ખાતાવહી', icon: BarChart3, path: '/ledger' }
 ]
 
@@ -37,7 +38,7 @@ export function MobileNavbar() {
     if (user?.isAdmin) return items
     // Non-admin users can only access dashboard, ledger, and view-only pages
     return items.filter(item => 
-      ['dashboard', 'ledger', 'challans', 'clients', 'stock'].includes(item.key)
+      ['dashboard', 'ledger', 'challans', 'clients', 'stock', 'bill-history'].includes(item.key)
     )
   }
 

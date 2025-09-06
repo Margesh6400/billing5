@@ -21,7 +21,7 @@ import { PrintableChallan } from '../challans/PrintableChallan';
 import { generateJPGChallan, downloadJPGChallan } from '../../utils/jpgChallanGenerator';
 import { ChallanData } from '../challans/types';
 import { generateClientLedgerJPG, downloadClientLedgerJPG, ClientLedgerData } from '../../utils/clientLedgerGenerator';
-// Typesnn
+// Types
 import { TransactionItem } from '../../types/transactionTypes';
 type Client = Database['public']['Tables']['clients']['Row'];
 type ChallanItem = Database['public']['Tables']['challan_items']['Row'];
